@@ -6,7 +6,7 @@ Hiredly Composer is an AI-powered research article writing tool designed to help
 
 ## Project info
 
-This repository contains the source code for Hiredly Composer, a web application built with React, TypeScript, and Tailwind CSS.
+This repository contains the source code for Hiredly Composer's demo, a web application built with React, TypeScript, and Tailwind CSS.
 
 ## How can I edit this code?
 
