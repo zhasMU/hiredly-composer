@@ -22,7 +22,7 @@ export const ProgressIndicator = ({ currentStep, className }: ProgressIndicatorP
           <div className="flex items-center space-x-2">
             <div
               className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors",
+                "w-8 h-8 min-w-[2rem] min-h-[2rem] rounded-full flex items-center justify-center text-sm font-medium transition-colors",
                 index < currentStep
                   ? "bg-primary text-primary-foreground"
                   : index === currentStep
