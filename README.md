@@ -61,7 +61,3 @@ npm run build
 ```
 
 Then follow your chosen provider's instructions to deploy the contents of the `dist` folder.
-
-## Custom Domain
-
-If you are using a hosting provider, refer to their documentation for connecting a custom domain to your deployed Hiredly Composer project.
