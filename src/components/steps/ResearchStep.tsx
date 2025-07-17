@@ -1,100 +1,208 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, Globe } from "lucide-react";
+import { ExternalLink, Globe, Play, TestTube } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { ResearchRequest } from "@/lib/n8n-service";
 
 interface ResearchStepProps {
-  onNext: () => void;
+  workflowManager: any; // We'll properly type this later
 }
 
-interface SourceCard {
-  id: string;
-  title: string;
-  excerpt: string;
-  domain: string;
-  favicon: string;
-  url: string;
-}
+export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
+  const [autoStarted, setAutoStarted] = useState(false);
 
-const mockSources: SourceCard[] = [
-  {
-    id: "1",
-    title: "The Future of Artificial Intelligence in Healthcare: A Comprehensive Review",
-    excerpt: "This study examines the transformative potential of AI technologies in medical diagnosis, treatment planning, and patient care optimization...",
-    domain: "nature.com",
-    favicon: "🔬",
-    url: "https://nature.com/articles/ai-healthcare"
-  },
-  {
-    id: "2", 
-    title: "Machine Learning Applications in Clinical Decision Support Systems",
-    excerpt: "Recent advances in machine learning have enabled the development of sophisticated clinical decision support tools that assist healthcare professionals...",
-    domain: "pubmed.ncbi.nlm.nih.gov",
-    favicon: "📚",
-    url: "https://pubmed.ncbi.nlm.nih.gov/articles/ml-clinical"
-  },
-  {
-    id: "3",
-    title: "AI-Powered Diagnostic Tools: Current State and Future Prospects",
-    excerpt: "The integration of artificial intelligence in diagnostic imaging and laboratory medicine has shown remarkable promise in improving accuracy...",
-    domain: "nejm.org",
-    favicon: "⚕️",
-    url: "https://nejm.org/ai-diagnostics"
-  },
-  {
-    id: "4",
-    title: "Ethical Considerations in AI-Driven Healthcare Systems",
-    excerpt: "As artificial intelligence becomes more prevalent in healthcare, addressing ethical concerns around privacy, bias, and accountability becomes crucial...",
-    domain: "bioethics.org",
-    favicon: "🤔",
-    url: "https://bioethics.org/ai-ethics"
-  },
-  {
-    id: "5",
-    title: "Cost-Effectiveness of AI Implementation in Healthcare Institutions",
-    excerpt: "Economic analysis of AI adoption in hospitals reveals significant potential for cost savings while improving patient outcomes...",
-    domain: "healtheconomics.com",
-    favicon: "💰",
-    url: "https://healtheconomics.com/ai-costs"
+  // Don't auto-start - let user choose between real and simulation
+  // useEffect(() => {
+  //   if (workflowManager.state.keywordsData && !autoStarted && !workflowManager.state.isLoading) {
+  //     setAutoStarted(true);
+  //     handleAutoStartResearch();
+  //   }
+  // }, [workflowManager.state.keywordsData, autoStarted, workflowManager.state.isLoading]);
+
+  const handleAutoStartResearch = async () => {
+    if (!workflowManager.state.keywordsData) return;
+
+    const researchRequest: ResearchRequest = {
+      keywords: workflowManager.state.keywordsData,
+      maxSources: 10,
+      sourceTypes: ['academic', 'web', 'news']
+    };
+    
+    setAutoStarted(true);
+    await workflowManager.executeResearch(researchRequest);
+  };
+
+  const handleSimulateResearch = async () => {
+    setAutoStarted(true);
+    await workflowManager.simulateResearch();
+  };
+
+  const handleRetryResearch = async () => {
+    setAutoStarted(false);
+    // Reset any error state
+    workflowManager.clearError();
+  };
+
+  // If we don't have keywords data yet, show waiting state
+  if (!workflowManager.state.keywordsData) {
+    return (
+      <div className="max-w-4xl mx-auto p-8 space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-3xl font-bold">Research Step</h1>
+          <p className="text-muted-foreground">
+            Waiting for keywords to be processed...
+          </p>
+        </div>
+      </div>
+    );
   }
-];
 
-export const ResearchStep = ({ onNext }: ResearchStepProps) => {
-  const [progress, setProgress] = useState(0);
-  const [displayedSources, setDisplayedSources] = useState<SourceCard[]>([]);
-  const [isComplete, setIsComplete] = useState(false);
+  // If research is complete, show results
+  if (workflowManager.state.researchData && !workflowManager.state.isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto p-8 space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-3xl font-bold">Research Complete!</h1>
+          <p className="text-muted-foreground">
+            Found {workflowManager.state.researchData.length} sources for your research
+          </p>
+        </div>
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress(prev => {
-        const newProgress = prev + 2;
-        
-        // Add sources as we progress
-        const sourceIndex = Math.floor(newProgress / 20);
-        if (sourceIndex < mockSources.length && sourceIndex >= displayedSources.length) {
-          setDisplayedSources(prev => [...prev, mockSources[sourceIndex]]);
-        }
-        
-        if (newProgress >= 100) {
-          setIsComplete(true);
-          clearInterval(timer);
-          return 100;
-        }
-        
-        return newProgress;
-      });
-    }, 100);
+        {/* Research Results */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Sources Found ({workflowManager.state.researchData.length})
+          </h2>
+          
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {workflowManager.state.researchData.map((source: any) => (
+              <Card 
+                key={source.id} 
+                className="animate-fade-in border-l-4 border-l-primary"
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="text-2xl">{source.favicon || "doc"}</div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-medium text-sm line-clamp-2">{source.title}</h3>
+                        <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {source.excerpt}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {source.domain}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          Score: {source.score}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {source.type}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
 
-    return () => clearInterval(timer);
-  }, [displayedSources.length]);
+        {/* Action Buttons */}
+        <div className="flex justify-center gap-4 pt-8">
+          <Button
+            onClick={() => workflowManager.nextStep()}
+            size="lg"
+            className="px-8"
+          >
+            Review Sources
+          </Button>
+          <Button
+            onClick={handleRetryResearch}
+            size="lg"
+            variant="outline"
+            className="px-6"
+          >
+            Start Over
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
+  // Show ready state with option to choose execution method
+  if (!autoStarted && !workflowManager.state.isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto p-8 space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-3xl font-bold">Ready for Research</h1>
+          <p className="text-muted-foreground">
+            Your keywords are ready. Choose how to proceed with research.
+          </p>
+        </div>
+
+        {/* Keywords Summary */}
+        <div className="bg-muted/50 rounded-lg p-6">
+          <h3 className="font-semibold mb-2">Research Query:</h3>
+          <p className="text-muted-foreground mb-4">{workflowManager.state.keywordsData.query}</p>
+          
+          {workflowManager.state.keywordsData.tags?.length > 0 && (
+            <div>
+              <h4 className="font-medium mb-2">Keywords:</h4>
+              <div className="flex flex-wrap gap-2">
+                {workflowManager.state.keywordsData.tags.map((tag: string) => (
+                  <Badge key={tag} variant="secondary">{tag}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex gap-4">
+            <Button
+              onClick={handleAutoStartResearch}
+              disabled={workflowManager.state.isLoading}
+              size="lg"
+              className="px-8"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Start Research (n8n Workflow)
+            </Button>
+            <Button
+              onClick={handleSimulateResearch}
+              disabled={workflowManager.state.isLoading}
+              size="lg"
+              variant="outline"
+              className="px-8"
+            >
+              <TestTube className="h-4 w-4 mr-2" />
+              Simulate Research (Test Data)
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            Use "Simulate Research" if your n8n workflows aren't ready yet, or if you want to test with consistent data.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading/progress state
   return (
     <div className="max-w-4xl mx-auto p-8 space-y-8">
       <div className="text-center space-y-4">
         <h1 className="text-3xl font-bold">Deep Research in Progress</h1>
         <p className="text-muted-foreground">
-          AI is analyzing sources and gathering relevant information...
+          {workflowManager.state.isLoading 
+            ? "AI is analyzing sources and gathering relevant information..."
+            : "Ready to start research"
+          }
         </p>
       </div>
 
@@ -119,61 +227,44 @@ export const ResearchStep = ({ onNext }: ResearchStepProps) => {
               fill="transparent"
               strokeLinecap="round"
               strokeDasharray={`${2 * Math.PI * 56}`}
-              strokeDashoffset={`${2 * Math.PI * 56 * (1 - progress / 100)}`}
+              strokeDashoffset={`${2 * Math.PI * 56 * (1 - (workflowManager.state.progress || 0) / 100)}`}
               className="transition-all duration-300 ease-out"
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-2xl font-bold">{progress}%</span>
+            <span className="text-2xl font-bold">{workflowManager.state.progress || 0}%</span>
           </div>
         </div>
       </div>
 
-      {/* Live Feed */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Globe className="h-5 w-5" />
-          Sources Found ({displayedSources.length})
-        </h2>
-        
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-          {displayedSources.map((source, index) => (
-            <Card 
-              key={source.id} 
-              className="animate-fade-in border-l-4 border-l-primary"
-              style={{ animationDelay: `${index * 200}ms` }}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="text-2xl">{source.favicon}</div>
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-medium text-sm line-clamp-2">{source.title}</h3>
-                      <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {source.excerpt}
-                    </p>
-                    <Badge variant="secondary" className="text-xs">
-                      {source.domain}
-                    </Badge>
-                  </div>
+      {/* Error state */}
+      {workflowManager.error && (
+        <div className="text-center space-y-4">
+          <p className="text-red-500">{workflowManager.error}</p>
+          <div className="flex justify-center gap-4">
+            <Button onClick={handleRetryResearch} variant="outline">
+              Try Again
+            </Button>
+            <Button onClick={handleSimulateResearch} variant="default">
+              Use Simulation Instead
+            </Button>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
         </div>
-      </div>
+      )}
 
-      {/* Next Button */}
-      {isComplete && (
-        <div className="flex justify-center pt-8 animate-fade-in">
-          <button
-            onClick={onNext}
-            className="px-8 py-3 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors"
+      {/* Cancel option during loading */}
+      {workflowManager.state.isLoading && (
+        <div className="flex justify-center">
+          <Button 
+            onClick={() => {
+              workflowManager.cancelExecution();
+              setAutoStarted(false);
+            }}
+            variant="outline"
+            size="sm"
           >
-            Review Sources
-          </button>
+            Cancel
+          </Button>
         </div>
       )}
     </div>
