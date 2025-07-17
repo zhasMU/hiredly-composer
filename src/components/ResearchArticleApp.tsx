@@ -9,11 +9,13 @@ import { DraftStep } from "@/components/steps/DraftStep";
 import { ScoreRefineStep } from "@/components/steps/ScoreRefineStep";
 import { FinalStep } from "@/components/steps/FinalStep";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, X } from "lucide-react";
+import { useWorkflowManager } from "@/hooks/use-workflow";
 
 const ResearchArticleApp = () => {
-  const [currentStep, setCurrentStep] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const workflowManager = useWorkflowManager();
 
   const steps = [
     "Keywords",
@@ -24,61 +26,68 @@ const ResearchArticleApp = () => {
     "Final"
   ];
 
-  const handleNextStep = () => {
-    if (currentStep === 0) {
-      // Show loading when transitioning to research
-      setIsLoading(true);
-      setTimeout(() => {
-        setIsLoading(false);
-        setCurrentStep(prev => prev + 1);
-      }, 2000);
-    } else {
-      setCurrentStep(prev => prev + 1);
-    }
-  };
+  const { state, error, clearError } = workflowManager;
+  const { currentStep, isLoading, progress } = state;
 
-  const handleRestart = () => {
-    setCurrentStep(0);
+  const getLoadingMessage = () => {
+    switch (currentStep) {
+      case 0: return "Processing keywords and planning research...";
+      case 1: return "Conducting deep research and gathering sources...";
+      case 2: return "Analyzing sources and extracting insights...";
+      case 3: return "Generating article draft with AI assistance...";
+      case 4: return "Analyzing quality and generating improvements...";
+      default: return "Processing...";
+    }
   };
 
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 0:
-        return <KeywordsStep onNext={handleNextStep} />;
+        return <KeywordsStep workflowManager={workflowManager} />;
       case 1:
-        return <ResearchStep onNext={handleNextStep} />;
+        return <ResearchStep workflowManager={workflowManager} />;
       case 2:
-        return <SourceReviewStep onNext={handleNextStep} />;
+        return <SourceReviewStep workflowManager={workflowManager} />;
       case 3:
-        return <DraftStep onNext={handleNextStep} />;
+        return <DraftStep workflowManager={workflowManager} />;
       case 4:
-        return <ScoreRefineStep onNext={handleNextStep} />;
+        return <ScoreRefineStep workflowManager={workflowManager} />;
       case 5:
-        return <FinalStep onRestart={handleRestart} />;
+        return <FinalStep workflowManager={workflowManager} />;
       default:
-        return <KeywordsStep onNext={handleNextStep} />;
+        return <KeywordsStep workflowManager={workflowManager} />;
     }
   };
 
-  const getCtaLabel = () => {
-    switch (currentStep) {
-      case 0: return "Start Research";
-      case 1: return "Review Sources";
-      case 2: return "Generate Draft";
-      case 3: return "Score & Refine";
-      case 4: return "Publish Draft";
-      case 5: return "Create New Article";
-      default: return "Next";
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-background">
       <LoadingOverlay 
         isVisible={isLoading} 
-        message="Initiating deep research..."
-        progress={undefined}
+        message={getLoadingMessage()}
+        progress={progress}
       />
+      
+      {/* Error Alert */}
+      {error && (
+        <div className="fixed top-4 right-4 z-50 max-w-md">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>{error}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={clearError}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
       
       {/* Top Bar */}
       <header className="sticky top-0 z-40 bg-card border-b border-border">
