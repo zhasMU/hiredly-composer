@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, Globe, Play, TestTube } from "lucide-react";
+import { ExternalLink, Globe, TestTube, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ResearchRequest } from "@/lib/n8n-service";
+import type { ResearchRequest, DeepResearchRequest } from "@/lib/n8n-service";
 
 interface ResearchStepProps {
   workflowManager: any; // We'll properly type this later
@@ -12,25 +12,15 @@ interface ResearchStepProps {
 export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
   const [autoStarted, setAutoStarted] = useState(false);
 
-  // Don't auto-start - let user choose between real and simulation
-  // useEffect(() => {
-  //   if (workflowManager.state.keywordsData && !autoStarted && !workflowManager.state.isLoading) {
-  //     setAutoStarted(true);
-  //     handleAutoStartResearch();
-  //   }
-  // }, [workflowManager.state.keywordsData, autoStarted, workflowManager.state.isLoading]);
-
-  const handleAutoStartResearch = async () => {
+  const handleStartDeepResearch = async () => {
     if (!workflowManager.state.keywordsData) return;
 
-    const researchRequest: ResearchRequest = {
-      keywords: workflowManager.state.keywordsData,
-      maxSources: 10,
-      sourceTypes: ['academic', 'web', 'news']
+    const deepResearchRequest: DeepResearchRequest = {
+      keyword: workflowManager.state.keywordsData.query,
     };
     
     setAutoStarted(true);
-    await workflowManager.executeResearch(researchRequest);
+    await workflowManager.executeDeepResearch(deepResearchRequest);
   };
 
   const handleSimulateResearch = async () => {
@@ -166,13 +156,13 @@ export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
         <div className="flex flex-col items-center gap-4">
           <div className="flex gap-4">
             <Button
-              onClick={handleAutoStartResearch}
+              onClick={handleStartDeepResearch}
               disabled={workflowManager.state.isLoading}
               size="lg"
               className="px-8"
             >
-              <Play className="h-4 w-4 mr-2" />
-              Start Research (n8n Workflow)
+              <Zap className="h-4 w-4 mr-2" />
+              Start Deep Research
             </Button>
             <Button
               onClick={handleSimulateResearch}
@@ -186,7 +176,7 @@ export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
             </Button>
           </div>
           <p className="text-sm text-muted-foreground text-center max-w-md">
-            Use "Simulate Research" if your n8n workflows aren't ready yet, or if you want to test with consistent data.
+            Use "Simulate Research" if you want to test with consistent data without calling the AI research workflow.
           </p>
         </div>
       </div>

@@ -99,7 +99,18 @@ const SAMPLE_TEST_SOURCES: EnhancedSource[] = [
 ];
 
 export const SourceReviewStep = ({ workflowManager }: SourceReviewStepProps) => {
-  const [sources, setSources] = useState<EnhancedSource[]>([]);
+  // Directly use and enhance the research data from the workflow manager.
+  // This avoids timing issues with internal state and useEffect.
+  const allSources: EnhancedSource[] = (workflowManager.state.researchData || []).map((source: Source) => ({
+    ...source,
+    isSelected: true, // Default to selected
+    validationStatus: 'pending' as const
+  }));
+
+  console.log('SourceReviewStep - workflowManager.state.researchData:', workflowManager.state.researchData);
+  console.log('SourceReviewStep - allSources:', allSources);
+
+  const [sources, setSources] = useState<EnhancedSource[]>(allSources);
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<"all" | "valid" | "flagged" | "pending">("all");
   const [selectedSource, setSelectedSource] = useState<EnhancedSource | null>(null);
@@ -108,16 +119,18 @@ export const SourceReviewStep = ({ workflowManager }: SourceReviewStepProps) => 
   const [currentValidatingUrl, setCurrentValidatingUrl] = useState<string>('');
   const { toast } = useToast();
 
-  // Initialize sources from workflow state
+  // Remove the useEffect hook that was previously managing state initialization.
+  // The state is now initialized directly from the props.
   useEffect(() => {
-    if (workflowManager.state.researchData) {
-      const enhancedSources: EnhancedSource[] = workflowManager.state.researchData.map((source: Source) => ({
+    // If the research data from the parent state changes, re-initialize the component's internal state.
+    console.log('SourceReviewStep useEffect - researchData changed:', workflowManager.state.researchData);
+    const newEnhancedSources: EnhancedSource[] = (workflowManager.state.researchData || []).map((source: Source) => ({
         ...source,
-        isSelected: true, // Default to selected
+        isSelected: true,
         validationStatus: 'pending' as const
-      }));
-      setSources(enhancedSources);
-    }
+    }));
+    console.log('SourceReviewStep useEffect - newEnhancedSources:', newEnhancedSources);
+    setSources(newEnhancedSources);
   }, [workflowManager.state.researchData]);
 
   // Load sample test data for testing
@@ -130,8 +143,10 @@ export const SourceReviewStep = ({ workflowManager }: SourceReviewStepProps) => 
   };
 
   const filteredSources = sources.filter(source => {
-    const matchesSearch = source.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         source.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesTitle = typeof source.title === 'string' && source.title.toLowerCase().includes(searchLower);
+    const matchesExcerpt = typeof source.excerpt === 'string' && source.excerpt.toLowerCase().includes(searchLower);
+    const matchesSearch = matchesTitle || matchesExcerpt;
     
     if (filter === "valid") return matchesSearch && source.validationStatus === 'valid';
     if (filter === "flagged") return matchesSearch && (source.validationStatus === 'invalid' || source.validationStatus === 'competitor');
@@ -256,7 +271,16 @@ export const SourceReviewStep = ({ workflowManager }: SourceReviewStepProps) => 
     }
   };
 
-  if (!sources.length) {
+  // The condition for showing "No Sources Found" should check the data from the parent,
+  // not the component's internal state, to avoid timing issues on render.
+  console.log('SourceReviewStep - Checking condition:', {
+    researchData: workflowManager.state.researchData,
+    researchDataLength: workflowManager.state.researchData?.length,
+    sources: sources,
+    sourcesLength: sources.length
+  });
+  
+  if (!workflowManager.state.researchData || workflowManager.state.researchData.length === 0) {
     return (
       <div className="max-w-4xl mx-auto p-8 text-center">
         <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -393,15 +417,15 @@ export const SourceReviewStep = ({ workflowManager }: SourceReviewStepProps) => 
               <tbody>
                 {filteredSources.map((source) => (
                   <tr key={source.id} className="border-b hover:bg-muted/30">
-                    <td className="p-4">
+                    <td className="p-4 align-top">
                       <Checkbox
                         checked={source.isSelected}
                         onCheckedChange={() => toggleSourceSelection(source.id)}
                         disabled={source.validationStatus === 'invalid' || source.validationStatus === 'competitor'}
                       />
                     </td>
-                    <td className="p-4">
-                      <div className="space-y-1">
+                    <td className="p-4 align-top">
+                      <div className="space-y-1 max-w-md">
                         <Dialog>
                           <DialogTrigger asChild>
                             <button 
@@ -417,14 +441,14 @@ export const SourceReviewStep = ({ workflowManager }: SourceReviewStepProps) => 
                             </DialogHeader>
                             <div className="space-y-4">
                               <div>
-                                <h4 className="font-medium mb-2">Excerpt</h4>
+                                <h4 className="font-medium mb-2">Evidence</h4>
                                 <p className="text-sm text-muted-foreground">{source.excerpt}</p>
                               </div>
                               <div>
                                 <h4 className="font-medium mb-2">Source Details</h4>
                                 <div className="space-y-1 text-sm">
                                   <p><strong>Domain:</strong> {source.domain}</p>
-                                  <p><strong>URL:</strong> {source.url}</p>
+                                  <p><strong>URL:</strong> <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{source.url}</a></p>
                                   <p><strong>Type:</strong> {source.type}</p>
                                   {source.validationMessage && (
                                     <p><strong>Validation:</strong> {source.validationMessage}</p>
@@ -434,36 +458,35 @@ export const SourceReviewStep = ({ workflowManager }: SourceReviewStepProps) => 
                             </div>
                           </DialogContent>
                         </Dialog>
-                        <div className="flex gap-2 flex-wrap">
+                        <div className="flex gap-2 flex-wrap items-center">
+                          {getValidationBadge(source)}
                           <Badge variant="outline" className="text-xs">
                             {source.domain}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
                             {source.type}
                             </Badge>
-                          {getValidationBadge(source)}
                         </div>
                       </div>
                     </td>
-                    <td className="p-4">
-                      <p className="text-sm text-muted-foreground line-clamp-2 max-w-xs">
-                        {source.excerpt}
-                      </p>
+                    <td className="p-4 text-sm text-muted-foreground align-top max-w-sm break-words">
+                      {source.excerpt}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 align-top">
                       {getValidationBadge(source)}
                       {source.validationMessage && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                           {source.validationMessage}
                         </p>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 align-top">
                       <div className="flex gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(source.url, '_blank')}
+                          onClick={() => source.url && window.open(source.url, '_blank')}
+                          disabled={!source.url}
                         >
                           <ExternalLink className="h-4 w-4" />
                         </Button>

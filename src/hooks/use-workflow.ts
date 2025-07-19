@@ -1,8 +1,7 @@
 // React Query hooks for workflow state management
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback, useEffect } from 'react';
-import {
-    n8nService,
+import type {
     KeywordsRequest,
     ResearchRequest,
     Source,
@@ -11,7 +10,10 @@ import {
     QualityMetrics,
     WorkflowResponse,
     ProgressUpdate,
+    DeepResearchRequest,
+    DeepResearchFact,
 } from '@/lib/n8n-service';
+import { n8nService } from '@/lib/n8n-service';
 
 // Mock data for simulation
 const mockSources: Source[] = [
@@ -89,6 +91,7 @@ interface WorkflowState {
     executionId: string | null;
     keywordsData: KeywordsRequest | null;
     researchData: Source[] | null;
+    deepResearchData: DeepResearchFact[] | null;
     draftData: ArticleContent | null;
     qualityData: QualityMetrics | null;
     feedback: string | null;
@@ -102,6 +105,7 @@ const initialState: WorkflowState = {
     executionId: null,
     keywordsData: null,
     researchData: null,
+    deepResearchData: null,
     draftData: null,
     qualityData: null,
     feedback: null,
@@ -210,6 +214,20 @@ export function useResearchConduction() {
         },
         onError: (error) => {
             console.error('Research failed:', error);
+        },
+    });
+}
+
+// New mutation for Deep Research
+export function useDeepResearch() {
+    return useMutation({
+        mutationFn: async (
+            request: DeepResearchRequest
+        ): Promise<WorkflowResponse<DeepResearchFact[]>> => {
+            return await n8nService.executeDeepResearchWorkflow(request);
+        },
+        onError: (error) => {
+            console.error('Deep research failed:', error);
         },
     });
 }
@@ -364,6 +382,7 @@ export function useWorkflowManager() {
 
     const keywordsMutation = useKeywordsProcessing();
     const researchMutation = useResearchConduction();
+    const deepResearchMutation = useDeepResearch();
     const sourceAnalysisMutation = useSourceAnalysis();
     const draftMutation = useDraftGeneration();
     const qualityMutation = useQualityAnalysis();
@@ -424,6 +443,107 @@ export function useWorkflowManager() {
             }
         },
         [researchMutation, workflow, handleError, clearError]
+    );
+
+    const executeDeepResearch = useCallback(
+        async (request: DeepResearchRequest) => {
+            try {
+                clearError();
+                workflow.updateState({ isLoading: true, error: null });
+
+                const rawResult = await deepResearchMutation.mutateAsync(request);
+
+                // n8n webhook responses often wrap a single result in an array.
+                // We handle this by taking the first element if it's an array.
+                const result = Array.isArray(rawResult) ? rawResult[0] : rawResult;
+
+                if (result && result.success) {
+                    // Ensure the data is an array before mapping. Even if n8n returns a single object,
+                    // we wrap it in an array to make the rest of the logic consistent.
+                    let factsArray = Array.isArray(result.data) ? result.data : [result.data];
+
+                    console.log('Deep Research - Raw facts from n8n:', factsArray);
+
+                    // Handle case where n8n returns stringified JSON instead of parsed objects
+                    if (factsArray.length > 0 && typeof factsArray[0] === 'string') {
+                        try {
+                            // Parse the JSON string
+                            factsArray = JSON.parse(factsArray[0]);
+                            console.log('Deep Research - Parsed JSON string:', factsArray);
+                        } catch (e) {
+                            console.error('Failed to parse JSON string from n8n:', e);
+                            throw new Error('Invalid JSON response from research workflow');
+                        }
+                    }
+
+                    // We need to transform the DeepResearchFact[] to Source[]
+                    const sources: Source[] = factsArray
+                        // Filter out any invalid items from the LLM response to prevent crashes
+                        .filter(fact => fact && typeof fact === 'object' && fact.heading && fact.source)
+                        .map((fact) => {
+                        let domain = '';
+                        let url = '';
+
+                        // The 'evidence' field often contains the real URL in markdown format.
+                        // e.g., "...some text... ([google.com](https://google.com))"
+                        const markdownLinkRegex = /\[.*?\]\((https?:\/\/[^\s)]+)\)/;
+                        
+                        // Safely check if fact.evidence exists and is a string before trying to match
+                        if (typeof fact.evidence === 'string') {
+                            const evidenceMatch = fact.evidence.match(markdownLinkRegex);
+                            if (evidenceMatch && evidenceMatch[1]) {
+                                url = evidenceMatch[1];
+                            }
+                        }
+
+                        // As a fallback, check if the source itself is a URL and we haven't found a URL yet
+                        if (!url && typeof fact.source === 'string' && fact.source.startsWith('http')) {
+                            url = fact.source;
+                        }
+
+                        // Try to parse the domain from the extracted URL
+                        try {
+                            if (url) {
+                                domain = new URL(url).hostname;
+                            }
+                        } catch (e) {
+                            console.warn(`Could not parse domain from URL: "${url}"`);
+                        }
+
+                        const transformedSource = {
+                            id: url || fact.source, // Use URL if available, otherwise fallback to source text
+                            title: fact.heading,
+                            excerpt: fact.evidence, // The UI component displays 'excerpt' in the 'Evidence' column.
+                            url: url,
+                            domain: domain,
+                            favicon: '', // No favicon from this API
+                            score: 0, // No score from this API
+                            type: 'web' as const, // Assuming 'web' type
+                        };
+
+                        console.log('Deep Research - Transformed source:', transformedSource);
+                        return transformedSource;
+                    });
+
+                    console.log('Deep Research - Final sources array:', sources);
+                    console.log('Deep Research - Sources array length:', sources.length);
+
+                    workflow.updateState({
+                        deepResearchData: factsArray,
+                        researchData: sources, // Overwrite researchData with transformed data
+                        executionId: result.executionId,
+                        isLoading: false,
+                    });
+                    workflow.nextStep();
+                } else {
+                    throw new Error(rawResult?.error || 'Deep research failed');
+                }
+            } catch (err) {
+                handleError(err);
+                workflow.updateState({ isLoading: false });
+            }
+        },
+        [deepResearchMutation, workflow, handleError, clearError]
     );
 
     const executeDraft = useCallback(
@@ -576,6 +696,7 @@ export function useWorkflowManager() {
         clearError,
         executeKeywords,
         executeResearch,
+        executeDeepResearch,
         executeDraft,
         executeQuality,
         executeRefine,
@@ -585,6 +706,7 @@ export function useWorkflowManager() {
         mutations: {
             keywords: keywordsMutation,
             research: researchMutation,
+            deepResearch: deepResearchMutation,
             sourceAnalysis: sourceAnalysisMutation,
             draft: draftMutation,
             quality: qualityMutation,
