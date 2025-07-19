@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { KeywordsRequest } from "@/lib/n8n-service";
 
 interface KeywordsStepProps {
-  onNext: () => void;
+  workflowManager: any; // We'll properly type this later
 }
 
 const sampleQueries = [
@@ -20,7 +21,7 @@ const sampleQueries = [
   "Future of remote work post-pandemic"
 ];
 
-export const KeywordsStep = ({ onNext }: KeywordsStepProps) => {
+export const KeywordsStep = ({ workflowManager }: KeywordsStepProps) => {
   const [query, setQuery] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [language, setLanguage] = useState("english");
@@ -48,6 +49,30 @@ export const KeywordsStep = ({ onNext }: KeywordsStepProps) => {
   const handleSampleClick = (sample: string) => {
     setQuery(sample);
     handleQueryChange(sample);
+  };
+
+  const handleStartResearch = async () => {
+    const keywordsRequest: KeywordsRequest = {
+      query,
+      tags,
+      language,
+      depth: depth[0],
+      explodedResults
+    };
+    
+    await workflowManager.executeKeywords(keywordsRequest);
+  };
+
+  const handleSimulateResearch = async () => {
+    const keywordsRequest: KeywordsRequest = {
+      query,
+      tags,
+      language,
+      depth: depth[0],
+      explodedResults
+    };
+    
+    await workflowManager.simulateKeywords(keywordsRequest);
   };
 
   return (
@@ -165,15 +190,24 @@ export const KeywordsStep = ({ onNext }: KeywordsStepProps) => {
         )}
       </div>
 
-      {/* Next Button */}
-      <div className="flex justify-center pt-8">
+      {/* Action Buttons */}
+      <div className="flex justify-center gap-4 pt-8">
         <Button
-          onClick={onNext}
-          disabled={!query.trim()}
+          onClick={handleStartResearch}
+          disabled={!query.trim() || workflowManager.state.isLoading}
           size="lg"
           className="px-8"
         >
-          Start Research
+          {workflowManager.state.isLoading ? "Processing..." : "Start Research (Real)"}
+        </Button>
+        <Button
+          onClick={handleSimulateResearch}
+          disabled={!query.trim() || workflowManager.state.isLoading}
+          size="lg"
+          variant="outline"
+          className="px-8"
+        >
+          {workflowManager.state.isLoading ? "Processing..." : "Simulate Research"}
         </Button>
       </div>
     </div>
