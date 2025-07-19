@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ProgressIndicator } from '@/components/ProgressIndicator';
-import { AppSidebar } from '@/components/AppSidebar';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { KeywordsStep } from '@/components/steps/KeywordsStep';
 import { ResearchStep } from '@/components/steps/ResearchStep';
@@ -14,7 +13,6 @@ import { AlertCircle, X } from 'lucide-react';
 import { useWorkflowManager } from '@/hooks/use-workflow';
 
 const ResearchArticleApp = () => {
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const workflowManager = useWorkflowManager();
 
     const steps = ['Keywords', 'Research', 'Source Review', 'Draft', 'Final'];
@@ -27,7 +25,7 @@ const ResearchArticleApp = () => {
             case 0:
                 return 'Processing keywords and planning research...';
             case 1:
-                return 'Conducting deep research and gathering sources...';
+                return 'Conducting deep research and gathering sources';
             case 2:
                 return 'Analyzing sources and extracting insights...';
             case 3:
@@ -59,9 +57,8 @@ const ResearchArticleApp = () => {
     return (
         <div className="min-h-screen bg-background">
             <LoadingOverlay
-                isVisible={isLoading}
+                isVisible={isLoading && currentStep === 1}
                 message={getLoadingMessage()}
-                progress={progress}
             />
 
             {/* Error Alert */}
@@ -100,21 +97,10 @@ const ResearchArticleApp = () => {
                 </div>
             </header>
 
-            <div className="flex">
-                {/* Sidebar */}
-                <AppSidebar
-                    isCollapsed={isSidebarCollapsed}
-                    onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                />
-
-                {/* Main Content */}
-                <main className="flex-1 min-h-[calc(100vh-73px)]">
-                    {renderCurrentStep()}
-                </main>
-            </div>
-
-            {/* Floating CTA (bottom-right) */}
-            {/* Removed floating button as per instructions */}
+            {/* Main Content - Full Width */}
+            <main className="min-h-[calc(100vh-73px)]">
+                {renderCurrentStep()}
+            </main>
         </div>
     );
 };

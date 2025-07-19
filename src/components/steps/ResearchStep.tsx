@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, Globe, Play, TestTube, Zap } from "lucide-react";
+import { ExternalLink, Globe, TestTube, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,27 +11,6 @@ interface ResearchStepProps {
 
 export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
   const [autoStarted, setAutoStarted] = useState(false);
-
-  // Don't auto-start - let user choose between real and simulation
-  // useEffect(() => {
-  //   if (workflowManager.state.keywordsData && !autoStarted && !workflowManager.state.isLoading) {
-  //     setAutoStarted(true);
-  //     handleAutoStartResearch();
-  //   }
-  // }, [workflowManager.state.keywordsData, autoStarted, workflowManager.state.isLoading]);
-
-  const handleAutoStartResearch = async () => {
-    if (!workflowManager.state.keywordsData) return;
-
-    const researchRequest: ResearchRequest = {
-      keywords: workflowManager.state.keywordsData,
-      maxSources: 10,
-      sourceTypes: ['academic', 'web', 'news']
-    };
-    
-    setAutoStarted(true);
-    await workflowManager.executeResearch(researchRequest);
-  };
 
   const handleStartDeepResearch = async () => {
     if (!workflowManager.state.keywordsData) return;
@@ -177,15 +156,6 @@ export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
         <div className="flex flex-col items-center gap-4">
           <div className="flex gap-4">
             <Button
-              onClick={handleAutoStartResearch}
-              disabled={workflowManager.state.isLoading}
-              size="lg"
-              className="px-8"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Start Research (n8n Workflow)
-            </Button>
-            <Button
               onClick={handleStartDeepResearch}
               disabled={workflowManager.state.isLoading}
               size="lg"
@@ -206,7 +176,7 @@ export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
             </Button>
           </div>
           <p className="text-sm text-muted-foreground text-center max-w-md">
-            Use "Simulate Research" if your n8n workflows aren't ready yet, or if you want to test with consistent data.
+            Use "Simulate Research" if you want to test with consistent data without calling the AI research workflow.
           </p>
         </div>
       </div>

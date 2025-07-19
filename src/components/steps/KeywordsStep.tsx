@@ -1,12 +1,8 @@
 import { useState } from "react";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { KeywordsRequest } from "@/lib/n8n-service";
 
 interface KeywordsStepProps {
@@ -24,10 +20,6 @@ const sampleQueries = [
 export const KeywordsStep = ({ workflowManager }: KeywordsStepProps) => {
   const [query, setQuery] = useState("");
   const [tags, setTags] = useState<string[]>([]);
-  const [language, setLanguage] = useState("english");
-  const [depth, setDepth] = useState([3]);
-  const [explodedResults, setExplodedResults] = useState(false);
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
@@ -51,28 +43,20 @@ export const KeywordsStep = ({ workflowManager }: KeywordsStepProps) => {
     handleQueryChange(sample);
   };
 
-  const handleStartResearch = async () => {
+  const handleContinue = () => {
     const keywordsRequest: KeywordsRequest = {
       query,
       tags,
-      language,
-      depth: depth[0],
-      explodedResults
+      language: "english",
+      depth: 3,
+      explodedResults: false
     };
     
-    await workflowManager.executeKeywords(keywordsRequest);
-  };
-
-  const handleSimulateResearch = async () => {
-    const keywordsRequest: KeywordsRequest = {
-      query,
-      tags,
-      language,
-      depth: depth[0],
-      explodedResults
-    };
-    
-    await workflowManager.simulateKeywords(keywordsRequest);
+    // Store keywords data and move to next step without loading
+    workflowManager.updateState({
+      keywordsData: keywordsRequest
+    });
+    workflowManager.nextStep();
   };
 
   return (
@@ -113,63 +97,6 @@ export const KeywordsStep = ({ workflowManager }: KeywordsStepProps) => {
           )}
         </div>
 
-        {/* Advanced Options */}
-        <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" className="w-full justify-between">
-              Advanced Options
-              <ChevronDown className={`h-4 w-4 transition-transform ${isAdvancedOpen ? 'rotate-180' : ''}`} />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-6 pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-muted/30 rounded-lg">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Language</label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="english">English</SelectItem>
-                    <SelectItem value="spanish">Spanish</SelectItem>
-                    <SelectItem value="french">French</SelectItem>
-                    <SelectItem value="german">German</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Research Depth</label>
-                <div className="px-3">
-                  <Slider
-                    value={depth}
-                    onValueChange={setDepth}
-                    max={5}
-                    min={1}
-                    step={1}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>Surface</span>
-                    <span>Deep</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Exploded Results</label>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={explodedResults}
-                    onCheckedChange={setExplodedResults}
-                  />
-                  <span className="text-sm text-muted-foreground">Include broader topics</span>
-                </div>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
         {/* Sample Queries */}
         {!query && (
           <div className="space-y-4">
@@ -190,24 +117,15 @@ export const KeywordsStep = ({ workflowManager }: KeywordsStepProps) => {
         )}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-center gap-4 pt-8">
+      {/* Action Button */}
+      <div className="flex justify-center pt-8">
         <Button
-          onClick={handleStartResearch}
-          disabled={!query.trim() || workflowManager.state.isLoading}
+          onClick={handleContinue}
+          disabled={!query.trim()}
           size="lg"
           className="px-8"
         >
-          {workflowManager.state.isLoading ? "Processing..." : "Start Research (Real)"}
-        </Button>
-        <Button
-          onClick={handleSimulateResearch}
-          disabled={!query.trim() || workflowManager.state.isLoading}
-          size="lg"
-          variant="outline"
-          className="px-8"
-        >
-          {workflowManager.state.isLoading ? "Processing..." : "Simulate Research"}
+          Continue
         </Button>
       </div>
     </div>
