@@ -38,6 +38,17 @@ export interface ResearchRequest {
     sourceTypes: string[];
 }
 
+export interface DeepResearchRequest {
+    keyword: string;
+}
+
+export interface DeepResearchFact {
+    heading: string;
+    summary: string;
+    evidence: string;
+    source: string;
+}
+
 export interface Source {
     id: string;
     title: string;
@@ -209,6 +220,15 @@ class N8nService {
         return this.makeRequest('/webhook/research', request, {
             timeout: 60000,
         }); // 60 second timeout for research
+    }
+
+    // New method for Deep Research
+    async executeDeepResearchWorkflow(
+        request: DeepResearchRequest
+    ): Promise<WorkflowResponse<DeepResearchFact[]>> {
+        return this.makeRequest('/webhook/deep-research', request, {
+            timeout: 180000, // 3 minute timeout for deep research
+        });
     }
 
     // Step 3: Source Analysis & Scoring

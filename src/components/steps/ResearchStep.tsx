@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, Globe, Play, TestTube } from "lucide-react";
+import { ExternalLink, Globe, Play, TestTube, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ResearchRequest } from "@/lib/n8n-service";
+import type { ResearchRequest, DeepResearchRequest } from "@/lib/n8n-service";
 
 interface ResearchStepProps {
   workflowManager: any; // We'll properly type this later
@@ -31,6 +31,17 @@ export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
     
     setAutoStarted(true);
     await workflowManager.executeResearch(researchRequest);
+  };
+
+  const handleStartDeepResearch = async () => {
+    if (!workflowManager.state.keywordsData) return;
+
+    const deepResearchRequest: DeepResearchRequest = {
+      keyword: workflowManager.state.keywordsData.query,
+    };
+    
+    setAutoStarted(true);
+    await workflowManager.executeDeepResearch(deepResearchRequest);
   };
 
   const handleSimulateResearch = async () => {
@@ -173,6 +184,15 @@ export const ResearchStep = ({ workflowManager }: ResearchStepProps) => {
             >
               <Play className="h-4 w-4 mr-2" />
               Start Research (n8n Workflow)
+            </Button>
+            <Button
+              onClick={handleStartDeepResearch}
+              disabled={workflowManager.state.isLoading}
+              size="lg"
+              className="px-8"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Start Deep Research
             </Button>
             <Button
               onClick={handleSimulateResearch}
