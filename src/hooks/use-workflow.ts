@@ -91,6 +91,7 @@ interface WorkflowState {
     researchData: Source[] | null;
     draftData: ArticleContent | null;
     qualityData: QualityMetrics | null;
+    feedback: string | null;
     isLoading: boolean;
     error: string | null;
     progress: number;
@@ -103,6 +104,7 @@ const initialState: WorkflowState = {
     researchData: null,
     draftData: null,
     qualityData: null,
+    feedback: null,
     isLoading: false,
     error: null,
     progress: 0,
@@ -259,6 +261,29 @@ export function useQualityAnalysis() {
     });
 }
 
+// Step 5.1: Refine draft
+export function useRefineDraft() {
+    return useMutation({
+        mutationFn: async ({
+            content,
+            feedback,
+        }: {
+            content: ArticleContent;
+            feedback: string;
+        }): Promise<
+            WorkflowResponse<{
+                evaluationResult: QualityMetrics;
+                refinedArticle: string;
+            }>
+        > => {
+            return await n8nService.refineDraft(content, feedback);
+        },
+        onError: (error) => {
+            console.error('Draft refinement failed:', error);
+        },
+    });
+}
+
 // Step 6: Article export
 export function useArticleExport() {
     return useMutation({
@@ -342,6 +367,7 @@ export function useWorkflowManager() {
     const sourceAnalysisMutation = useSourceAnalysis();
     const draftMutation = useDraftGeneration();
     const qualityMutation = useQualityAnalysis();
+    const refineMutation = useRefineDraft();
     const exportMutation = useArticleExport();
     const cancelMutation = useExecutionCancellation();
 
@@ -452,6 +478,39 @@ export function useWorkflowManager() {
         [qualityMutation, workflow, handleError, clearError]
     );
 
+    const executeRefine = useCallback(
+        async (content: ArticleContent, feedback: string) => {
+            try {
+                clearError();
+                workflow.updateState({ isLoading: true, error: null });
+
+                const result = await refineMutation.mutateAsync({
+                    content,
+                    feedback,
+                });
+
+                if (result.success) {
+                    workflow.updateState({
+                        qualityData: result.data.evaluationResult,
+                        executionId: result.executionId,
+                        draftData: {
+                            ...workflow.state.draftData!,
+                            content: result.data.refinedArticle,
+                        },
+                        isLoading: false,
+                    });
+                } else {
+                    console.error('Draft refinement failed:', result.error);
+                    throw new Error(result.error || 'Draft refinement failed');
+                }
+            } catch (err) {
+                handleError(err);
+                workflow.updateState({ isLoading: false });
+            }
+        },
+        [refineMutation, workflow, handleError, clearError]
+    );
+
     const cancelExecution = useCallback(async () => {
         if (workflow.state.executionId) {
             try {
@@ -519,6 +578,7 @@ export function useWorkflowManager() {
         executeResearch,
         executeDraft,
         executeQuality,
+        executeRefine,
         cancelExecution,
         simulateKeywords,
         simulateResearch,

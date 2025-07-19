@@ -66,6 +66,7 @@ export interface OutlineItem {
 export interface QualityMetrics {
     conciseness: number;
     coherence: number;
+    feedback: string;
 }
 
 export interface ArticleContent {
@@ -235,6 +236,22 @@ class N8nService {
     ): Promise<WorkflowResponse<QualityMetrics>> {
         return this.makeRequest('/webhook/score-article', {
             article: articleContent.content,
+        });
+    }
+
+    // Step 5.1: Refine draft
+    async refineDraft(
+        articleContent: ArticleContent,
+        feedback: string
+    ): Promise<
+        WorkflowResponse<{
+            evaluationResult: QualityMetrics;
+            refinedArticle: string;
+        }>
+    > {
+        return this.makeRequest('/webhook/refine-article', {
+            article: articleContent.content,
+            feedback: feedback,
         });
     }
 

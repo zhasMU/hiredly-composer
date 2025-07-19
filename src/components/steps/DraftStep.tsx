@@ -102,6 +102,8 @@ export const DraftStep = ({ workflowManager }: DraftStepProps) => {
     const [outline, setOutline] = useState<OutlineItem[]>(initialOutline);
     const [template, setTemplate] = useState('academic');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isRefining, setIsRefining] = useState(false);
+    const [feedback, setFeedback] = useState('');
     const [content, setContent] =
         useState(`# The Transformative Impact of Artificial Intelligence in Healthcare
 
@@ -237,6 +239,31 @@ Artificial intelligence represents a transformative force in healthcare, offerin
         [workflowManager.state.qualityData]
     );
 
+    const handleRefineDraft = async () => {
+        // Check if we have draft data to analyze
+        if (!workflowManager.state.draftData) {
+            console.error('No draft data available to be refined!');
+            return;
+        }
+
+        try {
+            setIsRefining(true);
+            await workflowManager.executeRefine(
+                workflowManager.state.draftData,
+                feedback
+            );
+
+            // Update local feedback state with the new feedback from workflow state
+            // setFeedback(workflowManager.state.qualityData?.feedback || '');
+
+            setIsRefining(false);
+        } catch (error) {
+            console.error('Draft refinement failed:', error);
+        } finally {
+            setIsRefining(false);
+        }
+    };
+
     const handleSimulateAnalyzeQuality = async () => {
         setIsAnalyzing(true);
 
@@ -250,12 +277,15 @@ Artificial intelligence represents a transformative force in healthcare, offerin
         const qualityMetrics: QualityMetrics = {
             conciseness: 3,
             coherence: 4,
+            feedback: 'Looks good to me',
         };
 
         workflowManager.updateState({
             qualityData: qualityMetrics,
             progress: 100,
         });
+
+        setFeedback(qualityMetrics.feedback || '');
 
         setIsAnalyzing(false);
     };
@@ -288,6 +318,20 @@ Artificial intelligence represents a transformative force in healthcare, offerin
             setIsAnalyzing(false);
         }
     };
+
+    // Sync local feedback with workflow state
+    useEffect(() => {
+        if (workflowManager.state.qualityData?.feedback) {
+            setFeedback(workflowManager.state.qualityData.feedback);
+        }
+    }, [workflowManager.state.qualityData?.feedback]);
+
+    // Sync local content with workflow state
+    useEffect(() => {
+        if (workflowManager.state.draftData?.content) {
+            setContent(workflowManager.state.draftData.content);
+        }
+    }, [workflowManager.state.draftData?.content]);
 
     const handleProceedToFinal = () => {
         // Update workflow state with current data
@@ -534,17 +578,6 @@ Artificial intelligence represents a transformative force in healthcare, offerin
                             <CheckCircle className="h-4 w-4 mr-2" />
                             {isAnalyzing ? 'Analyzing...' : 'Analyze Quality'}
                         </Button>
-                        <Button
-                            onClick={handleProceedToFinal}
-                            size="lg"
-                            className="px-8"
-                            disabled={workflowManager.state.isLoading}
-                        >
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            {workflowManager.state.isLoading
-                                ? 'Processing...'
-                                : 'AI Refine'}
-                        </Button>
                     </div>
 
                     {/* Quality Metrics */}
@@ -609,6 +642,41 @@ Artificial intelligence represents a transformative force in healthcare, offerin
                                     </Card>
                                 ))
                             )}
+                            <Card>
+                                <CardHeader className="pb-4">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle>Feedback</CardTitle>
+                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                            <span>
+                                                {feedback.split(' ').length}{' '}
+                                                words
+                                            </span>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <Textarea
+                                        value={feedback}
+                                        onChange={(e) =>
+                                            setFeedback(e.target.value)
+                                        }
+                                        className="min-h-[300px] font-mono text-sm resize-none"
+                                        placeholder="Enter your feedback here..."
+                                    />
+                                </CardContent>
+                            </Card>
+                            <Button
+                                onClick={handleRefineDraft}
+                                size="lg"
+                                className="px-8"
+                                disabled={
+                                    isRefining ||
+                                    workflowManager.state.isLoading
+                                }
+                            >
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                {isAnalyzing ? 'Refining...' : 'AI Refine'}
+                            </Button>
                         </div>
                     </div>
                 </div>
