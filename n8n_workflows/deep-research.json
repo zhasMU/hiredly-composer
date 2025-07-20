@@ -1,0 +1,411 @@
+{
+  "name": "deep-research",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "insert",
+        "insertMode": "override",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a helpful SEO writer. Your job is to research keywords and find verifiable facts.\nFor each fact, you MUST provide the following:\n- heading: A clear, concise heading for the fact.\n- summary: A brief summary of the information.\n- evidence: The specific text that supports the fact.\n- source: The direct, full URL where the evidence can be found. The URL must be accessible and start with http or https. \n\nYou have to find a minimum of 5 sources. Ideally, you should find 10 sources.\n\nReturn the output as a list in the following JSON format: [{\"heading\":\"<heading>\",\"summary\":\"<summary>\",\"evidence\":\"<evidence>\",\"source\":\"<https://www.example.com/article>\"}]"
+            },
+            {
+              "type": "user",
+              "message": "={{ $json.keyword }}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -780,
+        160
+      ],
+      "id": "72f7c48f-aa36-4f0d-9ed6-1dd46d0d2f5f",
+      "name": "Add System Prompt"
+    },
+    {
+      "parameters": {
+        "simplifyOutput": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -460,
+        160
+      ],
+      "id": "1be25854-8987-42bc-aa2c-decaca53b88e",
+      "name": "Get All Messages"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Generate a Session ID').item.json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -620,
+        440
+      ],
+      "id": "f01fa5a3-704b-496b-b394-b74b8e0ffa0e",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "deep-research",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        160
+      ],
+      "id": "b3aa59cc-cb8a-4523-a077-a9ab5bc53edb",
+      "name": "Webhook",
+      "webhookId": "bcdf6cf1-c103-4bd1-8d8f-1cd2edfbc56b"
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "sessionId"
+      },
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        160
+      ],
+      "id": "2dd07183-97c5-4307-9246-a0642a65c4fd",
+      "name": "Generate a Session ID"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "86653198-a8ab-40e3-a346-a4e3fbb20a1c",
+              "name": "=messages",
+              "value": "={{ \n$json.messages.map(message => {\n  let role\n\n  switch(message.id[2]) {\n    case \"SystemMessage\":\n      role = \"system\"\n      break;\n    case \"HumanMessage\":\n      role = \"user\"\n      break;\n    case \"AIMessage\":\n      role = \"assistant\"\n      break;\n  }\n\n  return {role: role, content: message.kwargs.content}\n})\n}}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -140,
+        160
+      ],
+      "id": "62539692-39fb-44b9-9c24-cda8df13a2c6",
+      "name": "Construct a list of Messages for OpenAI API"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": " https://api.openai.com/v1/responses",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "o4-mini"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.messages }}"
+            },
+            {
+              "name": "tools",
+              "value": "={{\n[{\n  \"type\": \"web_search_preview\"\n}]\n}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        160
+      ],
+      "id": "b556d39c-a903-42be-b6c4-2286639351e7",
+      "name": "Call OpenAI Platform API",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "2qiwjLivzKdnWheK",
+          "name": "OpenAI API Key Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1020,
+        160
+      ],
+      "id": "a0bb4b36-4ab9-4f2b-9e28-3ac5ea08f25b",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the value of the \"output\" field\nconst output = $input.first().json.output\n\n// Get the output with type \"output_text\"\nconst output_message = output.find(output =>\n  output.type === \"message\"\n)\n\nlet isValid = output_message != undefined\n\n// Extract evaluation result\nlet result = null\ntry {\n  result = JSON.parse(output_message.content[0].text.trim())\n} catch(SyntaxError) {\n  return {\n    \"isValid\": false,\n    \"result\": {\n      \"passed\": false,\n      \"evaluation\": null,\n      \"feedback\": \"The evaluation result is not written in the correct format. Fix it, return only the result in the correct format.\"\n    }\n  }\n}\n\nreturn result"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        160
+      ],
+      "id": "956701a3-f963-40dd-bf7f-bd5537e09b5c",
+      "name": "Parse JSON output"
+    },
+    {
+      "parameters": {
+        "content": "This is the node that calls OpenAI's API. You need to supply your OpenAI API key in order to use it:\n- Open the node\n- On the `Bearer auth` parameter, choose \"+Create new credential\"\n- Enter your OpenAI API key",
+        "height": 320,
+        "width": 420,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "cf7e7607-456e-400e-a832-469bf3a2f483",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        640,
+        160
+      ],
+      "id": "9484d3c7-d44e-4cc6-9418-2936ec3ee8ef",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a269d4e0-72a6-4474-af1d-90852c5ab2ff",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "10e7d17b-3fee-484d-88f9-9fefb2c2433c",
+              "name": "data",
+              "value": "={{ $json.data }}",
+              "type": "string"
+            },
+            {
+              "id": "52bee42c-5266-41c9-975b-19cee1146834",
+              "name": "executionId",
+              "value": "={{ $execution.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        160
+      ],
+      "id": "c38b6b29-8261-45db-a915-813f19b71a95",
+      "name": "Set"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1a54856-4d63-4801-928c-fd6b849bd802",
+              "name": "keyword",
+              "value": "={{ $('Webhook').item.json.body.keyword }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1000,
+        160
+      ],
+      "id": "9c22aff2-8480-4f93-943c-78e3c0ae5459",
+      "name": "Webhook-Set"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Add System Prompt": {
+      "main": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Messages": {
+      "main": [
+        [
+          {
+            "node": "Construct a list of Messages for OpenAI API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Add System Prompt",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generate a Session ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate a Session ID": {
+      "main": [
+        [
+          {
+            "node": "Webhook-Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct a list of Messages for OpenAI API": {
+      "main": [
+        [
+          {
+            "node": "Call OpenAI Platform API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OpenAI Platform API": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON output": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook-Set": {
+      "main": [
+        [
+          {
+            "node": "Add System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "195a5112-49ac-4a45-8d97-6e74e1363e8a",
+  "meta": {
+    "instanceId": "12dac942c870ba581843076a32ae6fc3461cf956303dad8624c91166b0c4949b"
+  },
+  "id": "pyMCnxErhdg9mkWI",
+  "tags": []
+}

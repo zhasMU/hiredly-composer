@@ -1,0 +1,179 @@
+{
+  "name": "[SEO Tool] Article Scoring Endpoint",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "score-article",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -60,
+        -80
+      ],
+      "id": "180a869e-83de-4c9c-911d-fdc0ca2b0481",
+      "name": "Article Scoring Endpoint",
+      "webhookId": "786013c2-8ac3-46cf-9533-4ea3a3fe779b"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "9nBkojnSuliOZm88",
+          "mode": "list",
+          "cachedResultName": "[SEO Tool] Article Scoring Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        360,
+        -80
+      ],
+      "id": "f4b7b163-4c32-430b-8c4e-9d4efdbf3c77",
+      "name": "Score the Article"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst requestBody = $input.first().json.body\n\nreturn {\n  \"article\": requestBody.article\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -80
+      ],
+      "id": "98b9cab0-1eae-4f76-8a7e-c32391006909",
+      "name": "Get Article"
+    },
+    {
+      "parameters": {
+        "content": "This webhook expects the article (as a raw text) in the \"body\" of the POST request.",
+        "height": 260,
+        "width": 220,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -120,
+        -200
+      ],
+      "typeVersion": 1,
+      "id": "49a9a83c-56fe-4939-92d8-a5e21365280f",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        760,
+        -80
+      ],
+      "id": "f7122552-022c-4b08-93ae-adf6498fcbcc",
+      "name": "Return the evaluation"
+    },
+    {
+      "parameters": {
+        "content": "This node triggers the \"[SEO Writer] Article Scoring Workflow\". To configure it, open the node and choose \"[SEO Writer] Article Scoring Workflow\" from the dropdown list (make sure you already have the workflow in your machine and rename it as mentioned above)",
+        "height": 420,
+        "width": 220,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        -340
+      ],
+      "typeVersion": 1,
+      "id": "3947ef8d-5b79-483f-be4a-954fc5f8f6a4",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"success\": true,\n  \"executionId\": \"0\",\n  \"data\": {\n    \"conciseness\": {{ $json.result.evaluation.conciseness }},\n    \"coherence\": {{ $json.result.evaluation.coherence }},\n    \"feedback\": \"{{ $json.result.feedback }}\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        -80
+      ],
+      "id": "bb88fa56-8648-4e72-b209-e9f735095582",
+      "name": "Edit Fields"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Article Scoring Endpoint": {
+      "main": [
+        [
+          {
+            "node": "Get Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score the Article": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Article": {
+      "main": [
+        [
+          {
+            "node": "Score the Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Return the evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ed3930be-21e5-418f-a50a-12cb8c0a79db",
+  "meta": {
+    "instanceId": "12dac942c870ba581843076a32ae6fc3461cf956303dad8624c91166b0c4949b"
+  },
+  "id": "8tZjPgMgvZ5WF86z",
+  "tags": []
+}

@@ -1,0 +1,585 @@
+{
+  "name": "[SEO Tool] Article Refinement Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "simplifyOutput": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        1180
+      ],
+      "id": "909f365d-c836-4f21-bcbe-9d4615024ac6",
+      "name": "Get All Messages"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "user",
+              "message": "=An editor has reviewed the article and gave the following feedback:\n\n```\n{{ $('Generate a Session ID').item.json.evaluation_result.feedback }}\n```\n\nKeep in mind that the article should have around 1000 words. Ideally, each paragraph consists of a maximum of 5 sentences. However, occassionally, paragraphs can have more than that (but does not exceed 75% of the paragraphs).\n\nNow, improve the article according to the feedback. Return ONLY the improved article."
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        140,
+        1180
+      ],
+      "id": "df919421-7d8e-4c4f-9598-cdd40494fd02",
+      "name": "Insert Feedback & Instructions"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": " https://api.openai.com/v1/responses",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4.1-mini"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.messages }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        1180
+      ],
+      "id": "162de2f9-9f64-4285-9308-d59ee2048832",
+      "name": "Refine the Article",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "w8KFDNkwwTLeN0TU",
+          "name": "OpenAI API Key"
+        },
+        "httpBearerAuth": {
+          "id": "2qiwjLivzKdnWheK",
+          "name": "OpenAI API Key Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the value of the \"output\" field\nconst output = $input.first().json.output[0]\n\n// Get the text message\nconst output_message = output.content[0].text\n\nreturn {\n  \"article\": output_message\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        1180
+      ],
+      "id": "3d2f19a5-676e-41a8-83a6-7749a82b17c1",
+      "name": "Get Refined Article"
+    },
+    {
+      "parameters": {
+        "content": "We need to generate a UUID. This is required by the Simple Memory node.",
+        "height": 320,
+        "width": 170,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        1040
+      ],
+      "id": "b58584ea-1cb9-42a3-b562-2afbcae76057",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "sessionId"
+      },
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        1180
+      ],
+      "id": "bc3b827a-199f-4f51-83ae-e8fcae03e0ef",
+      "name": "Generate a Session ID"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "86653198-a8ab-40e3-a346-a4e3fbb20a1c",
+              "name": "=messages",
+              "value": "={{ \n$json.messages.map(message => {\n  let role\n\n  switch(message.id[2]) {\n    case \"SystemMessage\":\n      role = \"system\"\n      break;\n    case \"HumanMessage\":\n      role = \"user\"\n      break;\n    case \"AIMessage\":\n      role = \"assistant\"\n      break;\n  }\n\n  return {role: role, content: message.kwargs.content}\n})\n}}",
+              "type": "array"
+            },
+            {
+              "id": "fe3dbe1f-666d-42b0-9d41-3f50b4adbb18",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        860,
+        1180
+      ],
+      "id": "200ccae1-f427-4446-a05b-55572ecb917c",
+      "name": "Construct a list of Messages of OpenAI API (without tool calling)"
+    },
+    {
+      "parameters": {
+        "content": "This webhook expects the article (as a raw text) in the \"body\" of the POST request.",
+        "height": 260,
+        "width": 220,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -900,
+        1080
+      ],
+      "typeVersion": 1,
+      "id": "a1ef55a8-b246-486d-b945-a332eddebcfa",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "A simple memory for holding the conversation context between our system and OpenAI LLM",
+        "height": 220,
+        "width": 260,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -420,
+        1480
+      ],
+      "typeVersion": 1,
+      "id": "f504efcb-7966-41fb-b3fd-a42a755a3434",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "refine-article",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        1180
+      ],
+      "id": "30e582e3-bb72-440f-b18a-4fc9518b6a9d",
+      "name": "Article Refinement Endpoint",
+      "webhookId": "2fdc7cc5-8928-4c64-af51-24baf834cb10"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the request body\nconst requestBody = $input.first().json.body\n\nreturn {\n  \"article\": requestBody.article,\n  \"evaluationRresult\": requestBody.evaluation_result\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -620,
+        1180
+      ],
+      "id": "34826fb2-4b53-4e3c-9f58-9d92b7d87e0a",
+      "name": "Get the Feedback and the Article"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Generate a Session ID').item.json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -280,
+        1580
+      ],
+      "id": "ae378ded-00d2-435c-967d-1cac38a91c5a",
+      "name": "Refinement Memory"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "insertMode": "override",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a helpful editor. Your task is to refine the article based on a feedback from another reviewer.\nFor context, the article is scored based on the following qualities:\n- Conciseness\n- Coherence\n\nThe score is in the range of 1 to 5.\n\nThen, independent from the above scores, the article is also reviewed to conform to the following parameters:\n- At least 75% of the paragraphs maximum of 5 sentences\n- Contains around 1000 words (20% margin is alright)\n\nIn order to pass the review, the article must:\n- Have a score of 4.0 for both Conciseness and Coherence\n- At least, 75% of the paragraphs have a maximum of 5 sentences\n- The article has around 1000 words, 20% margin is acceptable\n\nNow, you will be given an article to be refined along as well as the feedback."
+            },
+            {
+              "type": "user",
+              "message": "={{ $json.article }}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -220,
+        1180
+      ],
+      "id": "03d08f78-6fb4-46f8-81bb-6924dd6a9f44",
+      "name": "Refinement System Prompt"
+    },
+    {
+      "parameters": {
+        "content": "## Article Refinement Phase\n\nIf the user decided that the article does not pass the review, we will take the given feedback and prompt another LLM to improve the article based on the feedback.",
+        "height": 360,
+        "width": 1540,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        1000
+      ],
+      "id": "bc4ca1bf-318e-4a7e-8cb2-b456dbe51a48",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Then, we take the refined article and score it again.",
+        "height": 240,
+        "width": 370,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        1100
+      ],
+      "id": "b2ce2fff-fe48-4d2a-86d8-247c8fa44929",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2060,
+        1180
+      ],
+      "id": "082bb483-10e0-4013-9564-bb765f6155ec",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "9nBkojnSuliOZm88",
+          "mode": "list",
+          "cachedResultName": "[SEO Tool] Article Scoring Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1580,
+        1180
+      ],
+      "id": "1db17b82-576d-4993-91ba-5d0b7b80b6b1",
+      "name": "Score Refined Article"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the scoring result\nconst evaluationResult = $input.first().json\n\nconst article = $(\"Get Refined Article\").first().json.article\n\nreturn {\n  \"success\": true,\n  \"executionId\": \"0\",\n  \"data\": {\n    \"evaluationResult\": {\n      \"conciseness\": evaluationResult.result.evaluation.conciseness,\n      \"coherence\": evaluationResult.result.evaluation.coherence,\n      \"feedback\": evaluationResult.result.feedback\n    },\n    \"refinedArticle\": article\n  }\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        1180
+      ],
+      "id": "908f21b4-62f3-4d44-8a49-c9015afbf6bf",
+      "name": "Construct Response Body"
+    }
+  ],
+  "pinData": {
+    "Refine the Article": [
+      {
+        "json": {
+          "id": "resp_687b7044f2c4819f90faa0c0d7916e7c06d4b6b0e1072b5b",
+          "object": "response",
+          "created_at": 1752920132,
+          "status": "completed",
+          "background": false,
+          "error": null,
+          "incomplete_details": null,
+          "instructions": null,
+          "max_output_tokens": null,
+          "max_tool_calls": null,
+          "model": "gpt-4.1-mini-2025-04-14",
+          "output": [
+            {
+              "id": "msg_687b70453ac0819f8af48bf8513ef0bb06d4b6b0e1072b5b",
+              "type": "message",
+              "status": "completed",
+              "content": [
+                {
+                  "type": "output_text",
+                  "annotations": [],
+                  "logprobs": [],
+                  "text": "# The Transformative Impact of Artificial Intelligence in Healthcare\n\n## Introduction to AI in Healthcare\n\nArtificial intelligence (AI) represents one of the most significant technological advances in modern healthcare, offering unprecedented opportunities to enhance patient care, streamline operations, and improve clinical outcomes [1]. Driven by breakthroughs in machine learning, increased computational power, and the growing availability of healthcare data, AI integration in healthcare has accelerated rapidly. These advances enable systems capable of analyzing complex medical information at scale and speed, beyond human capability.\n\n## Current Applications and Technologies\n\nAI applications in healthcare cover a broad spectrum, from diagnostic imaging to clinical decision support. Machine learning algorithms have demonstrated remarkable accuracy in medical imaging, often matching or exceeding the performance of experienced clinicians [2]. These technologies excel in specialties like radiology, pathology, and ophthalmology, where detailed pattern recognition is essential. Beyond imaging, AI also supports predictive analytics for disease risk assessment and personalized treatment recommendations.\n\n## Benefits and Efficiency Gains\n\nImplementing AI in healthcare has improved diagnostic accuracy, treatment efficiency, and patient outcomes. AI-powered clinical decision support systems analyze vast patient data to suggest optimal treatment plans, reducing medical errors and elevating care quality [3]. Additionally, AI-driven automation has streamlined administrative tasks such as scheduling and billing, freeing healthcare professionals to focus more on patient care. These efficiency gains contribute to better resource allocation and lower healthcare costs overall.\n\n## Challenges and Limitations  \n\nDespite its promise, AI adoption in healthcare faces notable challenges. Protecting patient privacy and securing sensitive health data remain top priorities, as AI systems require access to extensive personal information. The \"black box\" nature of many AI models raises concerns about transparency and accountability in clinical decisions, making it difficult for practitioners to fully trust AI-generated recommendations [4]. Moreover, navigating regulatory requirements and ensuring robust validation for AI tools is essential to safe and effective clinical use.\n\n## Future Prospects and Developments\n\nThe future of AI in healthcare is promising, with emerging technologies enhancing personalization and precision. Innovations such as personalized medicine, advanced predictive analytics, and robotic-assisted surgery will expand AI’s impact. As AI systems become more interpretable and user-friendly, healthcare settings will see broader adoption. Integration with wearable devices and real-time monitoring will enable proactive care management and early interventions, transforming preventive medicine.\n\n## Conclusion and Recommendations\n\nArtificial intelligence is a transformative force in healthcare, offering vast potential to improve patient outcomes and operational efficiency. However, its successful implementation demands careful attention to ethical, regulatory, and technical challenges. Healthcare organizations should invest in secure data infrastructure, staff training, and collaborative partnerships to harness AI effectively while maintaining patient safety and trust. With thoughtful application, AI can revolutionize healthcare delivery for the better.\n\n## References\n\n[1] Nature Medicine - The Future of Artificial Intelligence in Healthcare  \n[2] PubMed - Machine Learning Applications in Clinical Decision Support  \n[3] Bioethics.org - Ethical Considerations in AI-Driven Healthcare Systems  \n[4] Health Economics - Cost-Effectiveness of AI Implementation"
+                }
+              ],
+              "role": "assistant"
+            }
+          ],
+          "parallel_tool_calls": true,
+          "previous_response_id": null,
+          "prompt_cache_key": null,
+          "reasoning": {
+            "effort": null,
+            "summary": null
+          },
+          "safety_identifier": null,
+          "service_tier": "default",
+          "store": true,
+          "temperature": 1,
+          "text": {
+            "format": {
+              "type": "text"
+            }
+          },
+          "tool_choice": "auto",
+          "tools": [],
+          "top_logprobs": 0,
+          "top_p": 1,
+          "truncation": "disabled",
+          "usage": {
+            "input_tokens": 800,
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens": 598,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 1398
+          },
+          "user": null,
+          "metadata": {}
+        }
+      }
+    ],
+    "Score Refined Article": [
+      {
+        "json": {
+          "isValid": true,
+          "result": {
+            "passed": false,
+            "evaluation": {
+              "conciseness": 4,
+              "coherence": 4,
+              "paragraph_length_within_5_sentences": true,
+              "less_than_1000_words": true
+            },
+            "feedback": "The article is well-structured and presents clear ideas, resulting in high coherence with a score of 4. It also maintains a concise style without excessive wordiness, earning a conciseness score of 4. Every paragraph contains 5 or fewer sentences, meeting the paragraph length criterion perfectly. However, the article falls short in terms of length, containing only 483 words, which is well below the desired approximate range of 1000 words (with a 20% margin). Due to this significant word count deficit, the article does not pass the review despite strong scores in conciseness, coherence, and paragraph length criteria."
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Get All Messages": {
+      "main": [
+        [
+          {
+            "node": "Construct a list of Messages of OpenAI API (without tool calling)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Feedback & Instructions": {
+      "main": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine the Article": {
+      "main": [
+        [
+          {
+            "node": "Get Refined Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Refined Article": {
+      "main": [
+        [
+          {
+            "node": "Score Refined Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate a Session ID": {
+      "main": [
+        [
+          {
+            "node": "Refinement System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct a list of Messages of OpenAI API (without tool calling)": {
+      "main": [
+        [
+          {
+            "node": "Refine the Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Article Refinement Endpoint": {
+      "main": [
+        [
+          {
+            "node": "Get the Feedback and the Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get the Feedback and the Article": {
+      "main": [
+        [
+          {
+            "node": "Generate a Session ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refinement Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Insert Feedback & Instructions",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Refinement System Prompt",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refinement System Prompt": {
+      "main": [
+        [
+          {
+            "node": "Insert Feedback & Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Refined Article": {
+      "main": [
+        [
+          {
+            "node": "Construct Response Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct Response Body": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "72c62b6c-b10d-4f4b-b99d-e9ee5f94c546",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "12dac942c870ba581843076a32ae6fc3461cf956303dad8624c91166b0c4949b"
+  },
+  "id": "kruegp5n51aAiLsf",
+  "tags": []
+}
