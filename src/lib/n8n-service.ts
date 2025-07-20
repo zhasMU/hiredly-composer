@@ -61,11 +61,7 @@ export interface Source {
 }
 
 export interface DraftRequest {
-    sources: Source[];
-    outline: OutlineItem[];
-    template: string;
-    tone: string;
-    targetLength: number;
+    facts: DeepResearchFact[];
 }
 
 export interface OutlineItem {

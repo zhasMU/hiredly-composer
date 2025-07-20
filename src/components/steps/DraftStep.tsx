@@ -30,11 +30,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
+    Source,
     DraftRequest,
     ArticleContent,
     OutlineItem,
     Citation,
     QualityMetrics,
+    DeepResearchFact,
 } from '@/lib/n8n-service';
 
 interface DraftStepProps {
@@ -101,6 +103,7 @@ const initialOutline: OutlineItem[] = [
 export const DraftStep = ({ workflowManager }: DraftStepProps) => {
     const [outline, setOutline] = useState<OutlineItem[]>(initialOutline);
     const [template, setTemplate] = useState('academic');
+    const [isGenerating, setIsGenerating] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isRefining, setIsRefining] = useState(false);
     const [feedback, setFeedback] = useState('');
@@ -150,20 +153,48 @@ Artificial intelligence represents a transformative force in healthcare, offerin
             })
         ) || [];
 
-    const handleGenerateDraft = async () => {
+    const handleSimulateGenerateDraft = async () => {
         const selectedSources = workflowManager.state.researchData || [];
 
         const draftRequest: DraftRequest = {
-            sources: selectedSources,
-            outline: outline,
-            template: template,
-            tone: 'professional',
-            targetLength: 2000,
+            facts: selectedSources,
         };
 
         // For now, simulate draft generation
         (await workflowManager.simulateDraft?.(draftRequest)) ||
             simulateDraftGeneration();
+    };
+
+    const handleGenerateDraft = async () => {
+        // Check if we have any research data
+        if (!workflowManager.state.researchData) {
+            console.error('No research data available for draft generation');
+            return;
+        }
+
+        const deepResearchFacts = workflowManager.state.deepResearchData || [];
+        const sourceTitles = workflowManager.state.researchData.map(
+            (item: Source) => item.title
+        );
+        const selectedFacts = deepResearchFacts.filter(
+            (item: DeepResearchFact) => sourceTitles.includes(item.heading)
+        );
+
+        console.log(sourceTitles);
+        console.log(deepResearchFacts);
+
+        const draftRequest: DraftRequest = {
+            facts: selectedFacts,
+        };
+
+        try {
+            setIsGenerating(true);
+            await workflowManager.executeDraft(draftRequest);
+        } catch (error) {
+            console.error('Draft generation failed:', error);
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const simulateDraftGeneration = async () => {
