@@ -1,0 +1,338 @@
+{
+  "name": "[SEO Tool] Article Scoring Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "insert",
+        "insertMode": "override",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a helpful editor. Your task is to score an article based on the following qualities:\n- Conciseness\n- Coherence\n\nThe score must be in the range of 1 to 5.\n\nThen, independent from the above scores, you have to make sure that the article conforms to the following parameters:\n- At least 75% of the paragraphs maximum of 5 sentences\n- Contains around 1000 words (20% margin is alright)\n\nIf the article conforms to the said requirements, flag the requirement as true, otherwise flag it as false.\n\nYou have access to the code_intrepreter tool. Use it when necessary, especially for counting operations (e.g. word counting, sentence counting).\n\nThen, you have to determine if the article passes your review or not. In order to pass, the article must:\n- Have a score of 4.0 for both Conciseness and Coherence\n- At least, 75% of the paragraphs have a maximum of 5 sentences\n- The article has around 1000 words, 20% margin is acceptable\n\nLastly, you also need to give a written justification for the scores including a conclusion on whether or not the article passess your review as a feedback\n\nReturn the result using the following JSON format:\n{\"passed\":{true / false},\"evaluation\":{\"conciseness\":\"{conciseness score}\",\"coherence\":\"{conherence score}\",\"paragraph_length_within_5_sentences\":{true / false},\"less_than_1000_words\":{true / false}},\"feedback\":\"{generated feedback}\"}\n\nRemember, always follow the expected structured output. Below is an example of a valid output:\n{\"evaluation\":{\"conciseness\":4.5,\"coherence\":3,\"paragraph_length_within_5_sentences\":true,\"less_than_1000_words\":false},\"feedback\":\"<generated feedback>\"}\n\nThe article will be provided inside triple backticks."
+            },
+            {
+              "type": "user",
+              "message": "={{ $json.article }}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -240,
+        1180
+      ],
+      "id": "64a983c6-a573-4403-800d-3d10feb48896",
+      "name": "Add System Prompt"
+    },
+    {
+      "parameters": {
+        "simplifyOutput": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        1180
+      ],
+      "id": "e03297c2-12f7-4371-88bc-7c844e3a72df",
+      "name": "Get All Messages"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Generate a Session ID').item.json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -80,
+        1480
+      ],
+      "id": "8b9fa1d8-d2f8-45ca-8c62-fd682d4739e7",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": " https://api.openai.com/v1/responses",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4.1-mini"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.messages }}"
+            },
+            {
+              "name": "tools",
+              "value": "={{\n[{\n  \"type\": \"code_interpreter\",\n  \"container\": {\"type\": \"auto\"}\n}]\n}}"
+            },
+            {
+              "name": "text",
+              "value": "={{ \n{\n  \"format\": {\n    \"type\": \"json_schema\",\n    \"name\": \"math_response\",\n    \"schema\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"passed\": {\n          \"type\": \"boolean\"\n        },\n        \"evaluation\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"conciseness\": {\n              \"type\": \"number\"\n            },\n            \"coherence\": {\n              \"type\": \"number\"\n            },\n            \"paragraph_length_within_5_sentences\": {\n              \"type\": \"boolean\"\n            },\n            \"less_than_1000_words\": {\n              \"type\": \"boolean\"\n            }\n          },\n          \"required\": [\n            \"conciseness\",\n            \"coherence\",\n            \"paragraph_length_within_5_sentences\",\n            \"less_than_1000_words\"\n          ],\n          \"additionalProperties\": false\n        },\n        \"feedback\": {\n          \"type\": \"string\"\n        }\n      },\n      \"required\": [\n        \"passed\",\n        \"evaluation\",\n        \"feedback\"\n      ],\n      \"additionalProperties\": false\n    },\n    \"strict\": true\n  }\n}\n}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        1180
+      ],
+      "id": "c207f81e-954a-40b2-adb8-8df7bdb77d87",
+      "name": "Ask AI to Score",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "w8KFDNkwwTLeN0TU",
+          "name": "OpenAI API Key"
+        },
+        "httpBearerAuth": {
+          "id": "2qiwjLivzKdnWheK",
+          "name": "OpenAI API Key Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the value of the \"output\" field\nconst output = $input.first().json.output\n\n// Get the output with type \"output_text\"\nconst output_message = output.find(output =>\n  output.type === \"message\"\n)\n\nlet isValid = output_message != undefined\n\n// Extract evaluation result\nlet result = null\ntry {\n  result = JSON.parse(output_message.content[0].text.trim())\n} catch(SyntaxError) {\n  return {\n    \"isValid\": false,\n    \"result\": {\n      \"passed\": false,\n      \"evaluation\": null,\n      \"feedback\": \"The evaluation result is not written in the correct format. Fix it, return only the result in the correct format.\"\n    }\n  }\n}\n\nreturn {\n  \"isValid\": isValid,\n  \"result\": result,\n  \"iteration\": $(\"Generate a Session ID\").first().json.iteration\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        1180
+      ],
+      "id": "9eacd247-1ad0-4d01-a115-3f6ed6c13e94",
+      "name": "Extract AI Scoring Result"
+    },
+    {
+      "parameters": {
+        "content": "## Article Scoring Phase\nIn this phase, we tell an LLM (an OpenAI model) to judge the provided article. Currently, this LLM judge's task is to score an article based on the following qualities:\n- Conciseness\n- Coherence\n\nThe score must be in the range of 1 to 5.\n\nThen, independent from the above scores, it has to make sure that the article conforms to the following parameters:\n- At least 75% of the paragraphs maximum of 5 sentences\n- Contains around 1000 words (20% margin is alright)\n\nIf the article conforms to the said requirements, the LLM will flag the requirement as true, otherwise flag it as false.\n\nThe LLM also have access to the code_intrepreter tool which it can use whenever necessary, especially for counting operations (e.g. word counting, sentence counting).",
+        "height": 540,
+        "width": 1260,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        820
+      ],
+      "id": "a17718db-dfeb-4d2a-a097-f143d11a40b2",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "We need to generate a UUID. This is required by the Simple Memory node.",
+        "height": 320,
+        "width": 170,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        1040
+      ],
+      "id": "eedc33a1-e91c-4025-ae35-042461133181",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "sessionId"
+      },
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        1180
+      ],
+      "id": "069050f8-fc34-4941-9bc5-8cbf75c68239",
+      "name": "Generate a Session ID"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "86653198-a8ab-40e3-a346-a4e3fbb20a1c",
+              "name": "=messages",
+              "value": "={{ \n$json.messages.map(message => {\n  let role\n\n  switch(message.id[2]) {\n    case \"SystemMessage\":\n      role = \"system\"\n      break;\n    case \"HumanMessage\":\n      role = \"user\"\n      break;\n    case \"AIMessage\":\n      role = \"assistant\"\n      break;\n  }\n\n  return {role: role, content: message.kwargs.content}\n})\n}}",
+              "type": "array"
+            },
+            {
+              "id": "fe3dbe1f-666d-42b0-9d41-3f50b4adbb18",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        420,
+        1180
+      ],
+      "id": "2759c144-56c4-43e6-9843-682050ead8ce",
+      "name": "Construct a list of Messages for OpenAI API"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -620,
+        1180
+      ],
+      "id": "033abdfb-d20b-44c0-b36c-6e74c7a9039d",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "content": "A simple memory for holding the conversation context between our system and OpenAI LLM",
+        "height": 220,
+        "width": 280,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -240,
+        1380
+      ],
+      "typeVersion": 1,
+      "id": "7ec80bab-069d-46a3-8f42-e69b3ff3c359",
+      "name": "Sticky Note3"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "article": "Booming Demand: Hiring Trends and Labour Market Data\n\nThe job outlook for 2025–2026 remains very strong for data science fields. Big Data Analytics (BDA) is now central to Malaysia’s digital economy, with the market projected to reach US$1.9 billion in 2025, up from US$1.1 billion in 2021. This 72% growth in four years highlights the rapid expansion of data-driven business. The government’s MyDIGITAL initiative aims to produce 35,000 data professionals by the end of 2025, reflecting a strategic focus on talent development.\n\nIndustries Driving the Demand for Data Professionals\n\nData science talent is highly sought after because nearly every industry embraces data-driven decision-making. Several sectors in Malaysia lead hiring of data professionals:\n\nFinance and Banking: Banks, fintech start-ups, insurance companies, and investment firms heavily invest in data analytics for fraud detection, risk management, and customer insights. The banking sector, along with telecommunications, accounts for nearly one-third of Malaysia’s data-driven spending. Financial institutions actively recruit data scientists to gain a competitive edge.\n\nTechnology and E-commerce: Large telecom operators, e-commerce platforms, and tech start-ups are major employers of data experts. Initiatives like the digital economy blueprint expand opportunities across fintech and other tech-driven businesses. These firms require machine learning and big data engineering specialists to analyze user behavior and develop AI-driven features.\n\nHealthcare: The healthcare and pharmaceutical sector increasingly deploys data analytics to improve patient care, medical research, and operations. Malaysia’s digital health push means hospitals and health-tech companies need data analysts to interpret clinical and public health data. Roles in healthcare analytics are growing, with some specialists commanding high salaries internationally. Local providers begin hiring data professionals for personalized medicine and health informatics projects.\n\nManufacturing and Industry 4.0: With Industry 4.0 adoption, manufacturing firms deploy IoT sensors and automation that generate massive data sets. This boosts demand for data engineers and analysts to optimize production, perform predictive maintenance, and forecast demand. Logistics and supply chain analytics roles rise as companies seek operational efficiency.\n\nTelecommunications: Telcos manage large volumes of customer and network data, hiring data scientists for network optimization, churn prediction, and marketing analytics. The telecommunications sector remains a key employer in data analytics.\n\nOther Services: Retailers use data for consumer insights and inventory management. Government agencies and consultancies build data science units for smart city projects and policy analysis. Education and hospitality sectors increasingly deploy analytics to inform decisions. Overall, data skills have broad cross-industry relevance, with employers from diverse fields actively recruiting data scientists.\n\nSalary Ranges for Data Science Roles in 2025\n\nSalaries for data science roles in Malaysia are competitive due to strong demand and talent scarcity. While pay varies by role, industry, and experience, data professionals earn well above the national average. Malaysia’s average monthly salary in 2025 is about RM5,200 (RM62,400 annually), but data roles typically command significantly higher wages:\n\nEntry-Level: Fresh graduates and junior data analysts start at approximately RM2,500–RM3,500 per month (RM30k–RM42k yearly), high for new grads in Malaysia. Entry-level roles typically see 10–15% salary growth within a few years as skills develop.\n\nMid-Level Data Analysts or Scientists: With 3–5 years of experience, mid-level professionals earn substantially more. Data analysts might earn RM96,000–RM180,000 annually (around RM8k–15k monthly). Data scientists and engineers often earn RM144,000–RM240,000 per year (RM12k–20k monthly), two to three times the national average.\n\nSpecialist and Senior Roles: Professionals like Data Architects and machine learning specialists command RM180,000–RM300,000 annually. Business Intelligence Managers and Lead Data Analysts often earn above RM200k per year.\n\nLeadership Positions: Heads of Data Analytics or Data Science Directors can earn RM300k–480k annually. Chief Data Officers and similar C-suite executives focused on data strategy often exceed RM500k per year, reflecting their vital organisational roles.\n\nActual salaries depend on factors such as industry (finance and tech often pay premiums), company size, and skills. Even at lower levels, data professionals enjoy strong salaries and growth prospects. Recruiters report 15–20% salary increases recently in tech and finance roles due to limited supply.\n\nProjected Outlook for 2025–2026\n\nDemand for data science professionals is expected to remain strong or accelerate through 2026. Several trends support sustained growth:\n\nDigital Economy Expansion: Malaysia’s ambition to be a digital economy leader by 2025 means more businesses will adopt data analytics and AI. Government initiatives attract data-driven investments, with growing investor confidence in local digital ecosystems. This growth increases job opportunities in data engineering, analytics, and AI development.\n\nSurging Tech Adoption: Technologies like AI, machine learning, cloud computing, and IoT are rapidly adopted across industries. AI and machine learning specialists rank among the fastest-growing global job categories. Malaysian roles combining AI and data science emerge in finance, healthcare, and retail, requiring skilled implementers and managers.\n\nTalent Shortage Continues: The supply of new data science graduates and reskilled workers grows but lags demand. Globally, demand is projected to exceed supply by 50% by 2026 in some markets. Malaysia’s shortage is evident from its Critical Occupations List inclusion for data roles and aggressive hiring. This ensures strong job security and bargaining power for qualified candidates.\n\nIndustry-Specific Growth: Finance will expand hiring for regulatory technology, fraud analytics, and customer personalization. Manufacturing and oil & gas invest in advanced analytics for Industry 4.0, boosting IoT data analysis teams. The public sector may increase hiring for smart city and government service projects. SMEs also seek data talent, often in hybrid roles combining analysis and business strategy. Thus, demand extends beyond large corporations.\n\nGlobal and Regional Trends: Malaysia competes with ASEAN neighbors for digital investments. To remain competitive, Malaysian companies will continue upskilling and hiring in data science. Higher salary costs and tighter talent shortages in regional hubs like Singapore may encourage companies to build data teams in Malaysia, boosting local demand.\n\nOverall, data science roles remain among Malaysia’s most promising and “future-proof” jobs. Job seekers entering the field in 2025 can anticipate abundant opportunities, while current professionals should see strong career progression. Employers will likely offer attractive packages—including competitive pay, training subsidies, and flexible work—to attract and retain talent. As organisations increasingly rely on data, the need for skilled interpreters and innovators will only grow."
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Add System Prompt": {
+      "main": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Messages": {
+      "main": [
+        [
+          {
+            "node": "Construct a list of Messages for OpenAI API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Add System Prompt",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask AI to Score": {
+      "main": [
+        [
+          {
+            "node": "Extract AI Scoring Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AI Scoring Result": {
+      "main": [
+        []
+      ]
+    },
+    "Generate a Session ID": {
+      "main": [
+        [
+          {
+            "node": "Add System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct a list of Messages for OpenAI API": {
+      "main": [
+        [
+          {
+            "node": "Ask AI to Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Generate a Session ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "af5c2d27-fe31-4624-898c-edf2a1dd967c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "12dac942c870ba581843076a32ae6fc3461cf956303dad8624c91166b0c4949b"
+  },
+  "id": "9nBkojnSuliOZm88",
+  "tags": []
+}
