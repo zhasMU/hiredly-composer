@@ -384,117 +384,27 @@ export const DraftStep = ({ workflowManager }: DraftStepProps) => {
     }
 
     return (
-        <div className="max-w-6xl mx-auto p-8 space-y-8">
-            <div className="text-center space-y-4">
-                <h1 className="text-3xl font-bold">Generate Draft</h1>
-                <p className="text-muted-foreground">
-                    Create your research article using the selected sources
-                </p>
-            </div>
-
-            <div className="grid lg:grid-cols-3 gap-8">
-                {/* Left Panel - Outline & Settings */}
-                <div className="space-y-6">
-                    {/* Template Selection */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm">
-                                Article Template
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Select
-                                value={template}
-                                onValueChange={setTemplate}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="academic">
-                                        Academic Paper
-                                    </SelectItem>
-                                    <SelectItem value="blog">
-                                        Blog Post
-                                    </SelectItem>
-                                    <SelectItem value="report">
-                                        Research Report
-                                    </SelectItem>
-                                    <SelectItem value="summary">
-                                        Executive Summary
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </CardContent>
-                    </Card>
-
-                    {/* Outline Editor */}
-                    <Card>
-                        <CardHeader className="pb-4">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm">
-                                    Article Outline
-                                </CardTitle>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={addOutlineItem}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {outline.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="flex items-center gap-2 group"
-                                >
-                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                    <input
-                                        type="text"
-                                        value={item.title}
-                                        onChange={(e) =>
-                                            updateOutlineItem(
-                                                item.id,
-                                                e.target.value
-                                            )
-                                        }
-                                        className="flex-1 bg-transparent border-none focus:outline-none text-sm"
-                                    />
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() =>
-                                            removeOutlineItem(item.id)
-                                        }
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-
-                    {/* Citations */}
-                    <Card>
+        <div className="max-w-7xl mx-auto p-8 space-y-6">
+            <div className="grid lg:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
+                {/* Left Panel - Citations */}
+                <div className="lg:col-span-1 space-y-4">
+                    <Card className="h-full">
                         <CardHeader>
                             <CardTitle className="text-sm">
                                 Citations ({citations.length})
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2">
+                        <CardContent className="space-y-2 overflow-y-auto">
                             {citations.map((citation) => (
                                 <div
                                     key={citation.id}
-                                    className="text-xs text-muted-foreground"
+                                    className="text-xs text-muted-foreground p-2 bg-muted/50 rounded"
                                 >
                                     <span className="font-medium">
                                         [{citation.number}]
                                     </span>{' '}
                                     {citation.title}
-                                    <div className="text-xs opacity-75">
+                                    <div className="text-xs opacity-75 mt-1">
                                         {citation.source}
                                     </div>
                                 </div>
@@ -503,194 +413,161 @@ export const DraftStep = ({ workflowManager }: DraftStepProps) => {
                     </Card>
                 </div>
 
-                {/* Main Content Area */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Draft Actions */}
-                    <div className="flex gap-3">
-                        <Button
-                            onClick={handleGenerateDraft}
-                            disabled={workflowManager.state.isLoading}
-                        >
-                            <FileText className="h-4 w-4 mr-2" />
-                            {workflowManager.state.isLoading
-                                ? 'Generating...'
-                                : 'Generate Draft'}
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={handleRegenerateDraft}
-                            disabled={workflowManager.state.isLoading}
-                        >
-                            <RotateCcw className="h-4 w-4 mr-2" />
-                            Regenerate
-                        </Button>
-                    </div>
-
+                {/* Center Panel - Article Content */}
+                <div className="lg:col-span-2 space-y-4 flex flex-col">
                     {/* Content Editor */}
-                    <Card>
+                    <Card className="flex-1 flex flex-col">
                         <CardHeader className="pb-4">
                             <div className="flex items-center justify-between">
                                 <CardTitle>Article Content</CardTitle>
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                    <span>
-                                        {content.split(' ').length} words
-                                    </span>
-                                    <span>
-                                        {Math.ceil(
-                                            content.split(' ').length / 200
-                                        )}{' '}
-                                        min read
-                                    </span>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                        <span>
+                                            {content.split(' ').length} words
+                                        </span>
+                                        <span>
+                                            {Math.ceil(
+                                                content.split(' ').length / 200
+                                            )}{' '}
+                                            min read
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={handleGenerateDraft}
+                                            disabled={workflowManager.state.isLoading}
+                                            size="sm"
+                                        >
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            {workflowManager.state.isLoading
+                                                ? 'Generating...'
+                                                : 'Generate'}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleRegenerateDraft}
+                                            disabled={workflowManager.state.isLoading}
+                                            size="sm"
+                                        >
+                                            <RotateCcw className="h-4 w-4 mr-2" />
+                                            Regenerate
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="flex-1 flex flex-col">
                             <Textarea
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
-                                className="min-h-[1000px] font-mono text-sm resize-none"
+                                className="flex-1 font-mono text-sm resize-none min-h-[600px]"
                                 placeholder="Your article content will appear here..."
                             />
                         </CardContent>
                     </Card>
+                </div>
 
-                    <div className="flex justify-center gap-4 pt-8">
-                        <Button
-                            variant="outline"
-                            onClick={handleSimulateAnalyzeQuality}
-                            disabled={
-                                isAnalyzing || workflowManager.state.isLoading
-                            }
-                        >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            {isAnalyzing
-                                ? 'Analyzing...'
-                                : 'SimulateAnalyze Quality'}
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={handleAnalyzeQuality}
-                            disabled={
-                                isAnalyzing || workflowManager.state.isLoading
-                            }
-                        >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            {isAnalyzing ? 'Analyzing...' : 'Analyze Quality'}
-                        </Button>
-                    </div>
-
+                {/* Right Panel - Quality & Feedback */}
+                <div className="lg:col-span-1 space-y-4 flex flex-col">
                     {/* Quality Metrics */}
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-semibold">
-                                Quality Metrics
-                            </h2>
-                        </div>
-
-                        <div className="space-y-4">
+                    <Card className="flex-1">
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm">Quality Metrics</CardTitle>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleAnalyzeQuality}
+                                    disabled={
+                                        isAnalyzing || workflowManager.state.isLoading
+                                    }
+                                    size="sm"
+                                >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3 overflow-y-auto">
                             {metrics.length === 0 ? (
-                                <Card>
-                                    <CardContent className="p-6 text-center">
-                                        <p className="text-muted-foreground">
-                                            No quality analysis available. Click
-                                            "Analyze Quality" to get started.
-                                        </p>
-                                    </CardContent>
-                                </Card>
+                                <div className="text-center p-4">
+                                    <p className="text-xs text-muted-foreground">
+                                        Run quality analysis to see metrics
+                                    </p>
+                                </div>
                             ) : (
                                 getQualityMetrics().map((metric) => (
-                                    <Card key={metric.id}>
-                                        <CardContent className="p-4">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="font-medium">
-                                                        {metric.name}
-                                                    </h3>
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger>
-                                                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p className="max-w-xs">
-                                                                    {
-                                                                        metric.tooltip
-                                                                    }
-                                                                </p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold">
-                                                        {metric.score}
-                                                    </span>
-                                                    <span className="text-muted-foreground">
-                                                        /{metric.maxScore}
-                                                    </span>
-                                                </div>
+                                    <div key={metric.id} className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1">
+                                                <h3 className="text-xs font-medium">
+                                                    {metric.name}
+                                                </h3>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger>
+                                                            <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p className="max-w-xs text-xs">
+                                                                {metric.tooltip}
+                                                            </p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                             </div>
-                                            <Progress
-                                                value={metric.score}
-                                                className="mb-2"
-                                            />
-                                            <p className="text-sm text-muted-foreground">
-                                                {metric.description}
-                                            </p>
-                                        </CardContent>
-                                    </Card>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-xs font-bold">
+                                                    {metric.score}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    /{metric.maxScore}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <Progress
+                                            value={(metric.score / metric.maxScore) * 100}
+                                            className="h-2"
+                                        />
+                                    </div>
                                 ))
                             )}
-                            <Card>
-                                <CardHeader className="pb-4">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle>Feedback</CardTitle>
-                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                            <span>
-                                                {feedback.split(' ').length}{' '}
-                                                words
-                                            </span>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <Textarea
-                                        value={feedback}
-                                        onChange={(e) =>
-                                            setFeedback(e.target.value)
-                                        }
-                                        className="min-h-[300px] font-mono text-sm resize-none"
-                                        placeholder="Enter your feedback here..."
-                                    />
-                                </CardContent>
-                            </Card>
-                            <Button
-                                onClick={handleRefineDraft}
-                                size="lg"
-                                className="px-8"
-                                disabled={
-                                    isRefining ||
-                                    workflowManager.state.isLoading
-                                }
-                            >
-                                <Sparkles className="h-4 w-4 mr-2" />
-                                {isAnalyzing ? 'Refining...' : 'AI Refine'}
-                            </Button>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Feedback Section */}
+                    <Card className="flex-1">
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm">AI Feedback</CardTitle>
+                                <Button
+                                    onClick={handleRefineDraft}
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={
+                                        isRefining ||
+                                        workflowManager.state.isLoading ||
+                                        !feedback.trim()
+                                    }
+                                >
+                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    Refine
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="flex-1 flex flex-col">
+                            <Textarea
+                                value={feedback}
+                                onChange={(e) => setFeedback(e.target.value)}
+                                className="flex-1 text-xs resize-none min-h-[200px]"
+                                placeholder="AI feedback will appear here after quality analysis..."
+                            />
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 
             {/* Footer Actions */}
-            <div className="flex justify-center gap-4 pt-8">
-                <Button
-                    variant="outline"
-                    onClick={handleGenerateDraft}
-                    disabled={workflowManager.state.isLoading}
-                >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Draft
-                </Button>
+            <div className="flex justify-center gap-4 pt-4 border-t">
                 <Button
                     onClick={handleProceedToScoring}
                     size="lg"
