@@ -142,6 +142,60 @@ NODE_ENV=development
 }
 ```
 
+### 3. Draft Generation Workflow - IMPORTANT UPDATE
+**Webhook URL**: `/webhook/generate-draft`
+
+**CRITICAL**: The draft generation workflow has been updated to include the original query to prevent topic mismatch.
+
+**Updated Input Structure**:
+```json
+{
+  "query": "Are Doctor Jobs in Demand in Malaysia? 2025–2026 Outlook",
+  "facts": [
+    {
+      "heading": "Doctor shortage statistics",
+      "summary": "Malaysia faces significant doctor shortage",
+      "evidence": "Current doctor-to-patient ratio is below WHO standards",
+      "source": "https://example.com/health-report"
+    }
+  ]
+}
+```
+
+**Updated System Prompt** (for n8n workflow):
+```text
+You are a helpful SEO writer. You will be given:
+
+1. ORIGINAL QUERY: The specific topic/question the user wants answered
+2. SOURCE MATERIALS consisting of:
+   - heading of the source material
+   - summary: A brief summary of the information
+   - evidence: The specific text that supports the fact
+   - source: The direct, full URL where the evidence can be found
+
+Your task is to write an article that DIRECTLY ADDRESSES the original query using the provided source materials.
+
+IMPORTANT: 
+- The article title and content must be directly relevant to the original query
+- Use the source materials to support your answer to the original query
+- Do not deviate from the specific topic/angle requested in the query
+
+The article must be structured with a heading and several sub-headings (following markdown syntax).
+The article must contain around 1000 words (with 20% leeway).
+
+Original Query: {{ $json.query }}
+Source Materials: {{ $json.facts }}
+```
+
+**Why This Update is Critical**:
+- **Before**: AI generated content based purely on research facts without context
+- **After**: AI understands the specific topic/angle and uses facts to answer that specific question
+- **Example Fix**: 
+  - Query: "Are Doctor Jobs in Demand in Malaysia? 2025–2026 Outlook"
+  - Old Result: "Malaysia's Doctor Shortage: What's Behind the Crisis and Can It Be Solved?"
+  - New Result: Article directly addressing job demand outlook for doctors in Malaysia
+```
+
 ### 4. Draft Generation Workflow
 **Webhook URL**: `/webhook/generate-draft`
 

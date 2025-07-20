@@ -125,6 +125,7 @@ export const DraftStep = ({ workflowManager }: DraftStepProps) => {
         const selectedSources = workflowManager.state.researchData || [];
 
         const draftRequest: DraftRequest = {
+            query: workflowManager.state.keywordsData?.query || '',
             facts: selectedSources,
         };
 
@@ -140,6 +141,12 @@ export const DraftStep = ({ workflowManager }: DraftStepProps) => {
             return;
         }
 
+        // Check if we have keywords data for the original query
+        if (!workflowManager.state.keywordsData?.query) {
+            console.error('No original query available for draft generation');
+            return;
+        }
+
         const deepResearchFacts = workflowManager.state.deepResearchData || [];
         const sourceTitles = workflowManager.state.researchData.map(
             (item: Source) => item.title
@@ -152,6 +159,7 @@ export const DraftStep = ({ workflowManager }: DraftStepProps) => {
         console.log(deepResearchFacts);
 
         const draftRequest: DraftRequest = {
+            query: workflowManager.state.keywordsData.query,
             facts: selectedFacts,
         };
 

@@ -61,6 +61,7 @@ export interface Source {
 }
 
 export interface DraftRequest {
+    query: string; // Original user query/topic
     facts: DeepResearchFact[];
 }
 
