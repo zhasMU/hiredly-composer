@@ -1,0 +1,436 @@
+{
+  "name": "draft-generator",
+  "nodes": [
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "sessionId"
+      },
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        200,
+        0
+      ],
+      "id": "9187f876-3841-4215-9946-d762798b16af",
+      "name": "Generate a Session ID"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "insertMode": "override",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a helpful SEO writer. Your will be given a set of source materials consisting of:\n- heading of the source material\n- summary: A brief summary of the information.\n- evidence: The specific text that supports the fact.\n- source: The direct, full URL where the evidence can be found.\n\nYour task is to compose this set of materials into one coherent and concise article, ready to be published in our company's blog site.\nThe article must be structured with a heading and several sub-headings (following the markdown syntax).\nThe article must contain around 1000 words (with 20% leeway)"
+            },
+            {
+              "type": "user",
+              "message": "={{ $json.body.facts.toJsonString() }}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        420,
+        0
+      ],
+      "id": "b2468bec-a2d0-4177-a2ac-3165a42e73f3",
+      "name": "Add System Prompt"
+    },
+    {
+      "parameters": {
+        "simplifyOutput": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        740,
+        0
+      ],
+      "id": "d50090ab-4f29-498d-bc56-00d50294b23d",
+      "name": "Get All Messages"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Generate a Session ID').item.json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        580,
+        280
+      ],
+      "id": "bd4569ea-b2de-469f-b47a-b22fc9db1570",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "86653198-a8ab-40e3-a346-a4e3fbb20a1c",
+              "name": "=messages",
+              "value": "={{ \n$json.messages.map(message => {\n  let role\n\n  switch(message.id[2]) {\n    case \"SystemMessage\":\n      role = \"system\"\n      break;\n    case \"HumanMessage\":\n      role = \"user\"\n      break;\n    case \"AIMessage\":\n      role = \"assistant\"\n      break;\n  }\n\n  return {role: role, content: message.kwargs.content}\n})\n}}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1060,
+        0
+      ],
+      "id": "b31b0f92-1124-4049-bd34-bbbdff1e7a51",
+      "name": "Construct a list of Messages for OpenAI API"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": " https://api.openai.com/v1/responses",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4.1"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.messages }}"
+            },
+            {
+              "name": "tools",
+              "value": "={{\n[{\n  \"type\": \"web_search_preview\"\n}]\n}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        0
+      ],
+      "id": "fd25041e-54c6-43ca-b046-bcdaf1ac0617",
+      "name": "Call OpenAI Platform API",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "2qiwjLivzKdnWheK",
+          "name": "OpenAI API Key Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "This is the node that calls OpenAI's API. You need to supply your OpenAI API key in order to use it:\n- Open the node\n- On the `Bearer auth` parameter, choose \"+Create new credential\"\n- Enter your OpenAI API key",
+        "height": 320,
+        "width": 420,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "cb25b871-44bf-46e7-899f-2cfcabace5fe",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the value of the \"output\" field\nconst output = $input.first().json.output\n\n// Get the output with type \"output_text\"\nconst output_message = output.find(output =>\n  output.type === \"message\"\n)\n\n// Extract evaluation result\nlet draft = output_message.content[0].text\n\nreturn {\n  \"success\": true,\n  \"executionId\": \"0\",\n  \"data\": {\n    \"title\": \"\",\n    \"content\": draft,\n    \"citations\": [],\n    \"outline\": []\n  }\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "id": "f81ee118-18b2-44da-8a0b-673b9f4e2f02",
+      "name": "Parse JSON output"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1920,
+        0
+      ],
+      "id": "9831b92e-72b0-4247-ae60-33581124646a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-draft",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5222bb6c-96ba-4b7b-b756-fb812da1ca95",
+      "name": "Webhook endpoint",
+      "webhookId": "b2f348d7-818b-41f8-8a32-a78f8def8f47"
+    }
+  ],
+  "pinData": {
+    "Call OpenAI Platform API": [
+      {
+        "json": {
+          "id": "resp_687cf01a26c881a1980cc9debde48772064ab1a2db2282e3",
+          "object": "response",
+          "created_at": 1753018394,
+          "status": "completed",
+          "background": false,
+          "error": null,
+          "incomplete_details": null,
+          "instructions": null,
+          "max_output_tokens": null,
+          "max_tool_calls": null,
+          "model": "gpt-4.1-2025-04-14",
+          "output": [
+            {
+              "id": "msg_687cf01a76a881a1af962455b78d5e73064ab1a2db2282e3",
+              "type": "message",
+              "status": "completed",
+              "content": [
+                {
+                  "type": "output_text",
+                  "annotations": [],
+                  "logprobs": [],
+                  "text": "# The Role of Machine Learning and Artificial Intelligence in Transforming Healthcare\n\nThe healthcare sector is undergoing a rapid transformation, driven by the remarkable progress in machine learning (ML) and artificial intelligence (AI). These technologies are revolutionizing clinical decision-making, diagnostics, and even raising new ethical questions. As hospitals and clinics adopt these digital advancements, understanding their applications, benefits, and ethical challenges is vital for practitioners and patients alike.\n\n---\n\n## Machine Learning Applications in Clinical Decision Support Systems\n\nThe integration of machine learning into healthcare has paved the way for sophisticated **clinical decision support systems (CDSS)**. These systems leverage advanced algorithms to process vast amounts of patient data and medical knowledge, aiding clinicians in making evidence-based decisions.\n\nMachine learning models analyze structured data, such as electronic health records (EHRs), lab results, and demographic information, along with unstructured data, like physician notes or medical literature. By identifying patterns and correlations that might escape human notice, ML-driven CDSS can:\n\n- Suggest personalized treatment options based on patient history and current research.\n- Alert healthcare providers to potential adverse drug interactions or allergic reactions.\n- Help prioritize cases by predicting patient deterioration or readmission risk.\n\nA key advantage is the capacity for these systems to continuously learn and update, incorporating the latest research and outcomes into their recommendations. This dynamic approach enables healthcare professionals to deliver more accurate, timely, and individualized care than ever before (“Recent advances in machine learning have enabled the development of sophisticated clinical decision support tools that assist healthcare professionals in making evidence-based decisions.”)  \nSource: [pubmed.ncbi.nlm.nih.gov](https://pubmed.ncbi.nlm.nih.gov)\n\n---\n\n## AI-Powered Diagnostic Tools: Current State and Future Prospects\n\nArtificial intelligence has also made headlines for its burgeoning role in **diagnostic imaging and laboratory medicine**. AI-powered tools, particularly those harnessing deep learning, boast impressive abilities in image recognition and pattern analysis, rivaling—and in some cases outperforming—human experts.\n\n### Current Applications\n\n- **Radiology and Medical Imaging**: AI algorithms can analyze X-rays, CT scans, and MRIs to detect anomalies such as tumors, fractures, or infections. These applications not only increase diagnostic accuracy but also speed up workflows, reducing waiting times for patients.\n- **Pathology and Laboratory Testing**: Machine learning techniques sift through complex datasets from blood tests or tissue biopsies, identifying markers for diseases—including cancers and rare genetic disorders—often faster and more accurately than manual analysis.\n- **Predictive Analytics**: AI models can predict the likelihood of disease progression, hospital admission, or treatment response, giving both doctors and patients valuable information for making timely decisions.\n\n### Future Prospects\n\nThe future holds even greater potential. As AI systems gain access to more diverse datasets and become more transparent, they will further improve diagnostic precision. Innovations in wearable technology and remote patient monitoring will continuously stream data into these algorithms, enabling **real-time health monitoring** and earlier interventions.\n\n“The integration of artificial intelligence in diagnostic imaging and laboratory medicine has shown remarkable promise in improving accuracy, efficiency, and patient outcomes.”  \nSource: [nejm.org](https://nejm.org)\n\n---\n\n## Ethical Considerations in AI-Driven Healthcare Systems\n\nWhile the benefits of AI in healthcare are evident, these advances also introduce **complex ethical challenges**. Responsible adoption requires thoughtful consideration of issues such as privacy, bias, transparency, and accountability.\n\n### Privacy and Data Security\n\nAI systems rely on large datasets, often containing sensitive patient information. Ensuring the privacy and security of this data is paramount. Healthcare organizations must safeguard against data breaches and misuse, adhering to stringent regulations like HIPAA in the United States or GDPR in Europe.\n\n### Bias and Fairness\n\nML and AI tools are only as objective as the data they’re trained on. If historical data reflects existing inequalities or biases—such as underrepresentation of certain populations—the resulting algorithms may inadvertently perpetuate these issues. Making AI systems fair and inclusive requires diverse datasets and ongoing auditing to identify and correct bias.\n\n### Transparency and Accountability\n\nAs AI becomes more embedded in clinical workflows, questions arise regarding responsibility. If an AI system makes an erroneous recommendation resulting in patient harm, determining accountability is challenging. Healthcare providers, developers, and regulators need clear guidelines for the deployment, monitoring, and governance of these tools.\n\n“As artificial intelligence becomes more prevalent in healthcare, addressing ethical concerns around privacy, bias, and accountability becomes crucial for successful implementation.”  \nSource: [bioethics.org](https://bioethics.org)\n\n---\n\n## Conclusion: Moving Towards Responsible AI Adoption in Healthcare\n\nThe application of machine learning and artificial intelligence in healthcare is reshaping clinical decision-making, diagnosis, and patient management. From supporting clinicians with evidence-based recommendations to enabling earlier and more accurate disease detection, these technologies offer immense potential for improving patient outcomes.\n\nHowever, to fully realize the promise of AI-driven healthcare, stakeholders must address ethical concerns and operational challenges. This includes:\n\n- Investing in robust data infrastructure and privacy protections.\n- Ensuring training data is representative and algorithms are regularly evaluated for bias.\n- Fostering collaboration between clinicians, technologists, ethicists, and patients to build trust and transparency in AI deployment.\n\nAs we stand at the intersection of medicine and technology, embracing both innovation and responsibility will be essential. Healthcare professionals, patients, and the industry as a whole must work together to harness the power of artificial intelligence—making healthcare not only smarter but also fairer and more compassionate.\n\n---\n\n**References**  \n- [Machine Learning Applications in Clinical Decision Support Systems – PubMed](https://pubmed.ncbi.nlm.nih.gov)  \n- [AI-Powered Diagnostic Tools: Current State and Future Prospects – NEJM](https://nejm.org)  \n- [Ethical Considerations in AI-Driven Healthcare Systems – Bioethics.org](https://bioethics.org)"
+                }
+              ],
+              "role": "assistant"
+            }
+          ],
+          "parallel_tool_calls": true,
+          "previous_response_id": null,
+          "prompt_cache_key": null,
+          "reasoning": {
+            "effort": null,
+            "summary": null
+          },
+          "safety_identifier": null,
+          "service_tier": "default",
+          "store": true,
+          "temperature": 1,
+          "text": {
+            "format": {
+              "type": "text"
+            }
+          },
+          "tool_choice": "auto",
+          "tools": [
+            {
+              "type": "web_search_preview",
+              "search_context_size": "medium",
+              "user_location": {
+                "type": "approximate",
+                "city": null,
+                "country": "US",
+                "region": null,
+                "timezone": null
+              }
+            }
+          ],
+          "top_logprobs": 0,
+          "top_p": 1,
+          "truncation": "disabled",
+          "usage": {
+            "input_tokens": 660,
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens": 1180,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 1840
+          },
+          "user": null,
+          "metadata": {}
+        }
+      }
+    ],
+    "Webhook endpoint": [
+      {
+        "json": {
+          "headers": {
+            "host": "localhost:5678",
+            "connection": "keep-alive",
+            "content-length": "1480",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+            "sec-ch-ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"138\", \"Google Chrome\";v=\"138\"",
+            "content-type": "application/json",
+            "sec-ch-ua-mobile": "?0",
+            "accept": "*/*",
+            "origin": "http://localhost:8080",
+            "sec-fetch-site": "same-site",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-dest": "empty",
+            "referer": "http://localhost:8080/",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9,id;q=0.8"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "facts": [
+              {
+                "heading": "Machine Learning Applications in Clinical Decision Support Systems",
+                "summary": "Recent advances in machine learning have enabled the development of sophisticated clinical decision support tools that assist healthcare professionals in making evidence-based decisions.",
+                "evidence": "Recent advances in machine learning have enabled the development of sophisticated clinical decision support tools that assist healthcare professionals in making evidence-based decisions.",
+                "source": "pubmed.ncbi.nlm.nih.gov"
+              },
+              {
+                "heading": "AI-Powered Diagnostic Tools: Current State and Future Prospects",
+                "summary": "The integration of artificial intelligence in diagnostic imaging and laboratory medicine has shown remarkable promise in improving accuracy, efficiency, and patient outcomes.",
+                "evidence": "The integration of artificial intelligence in diagnostic imaging and laboratory medicine has shown remarkable promise in improving accuracy, efficiency, and patient outcomes.",
+                "source": "nejm.org"
+              },
+              {
+                "heading": "Ethical Considerations in AI-Driven Healthcare Systems",
+                "summary": "As artificial intelligence becomes more prevalent in healthcare, addressing ethical concerns around privacy, bias, and accountability becomes crucial for successful implementation.",
+                "evidence": "As artificial intelligence becomes more prevalent in healthcare, addressing ethical concerns around privacy, bias, and accountability becomes crucial for successful implementation.",
+                "source": "bioethics.org"
+              }
+            ]
+          },
+          "webhookUrl": "http://localhost:5678/webhook-test/generate-draft",
+          "executionMode": "test"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Add System Prompt": {
+      "main": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Messages": {
+      "main": [
+        [
+          {
+            "node": "Construct a list of Messages for OpenAI API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Get All Messages",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Add System Prompt",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate a Session ID": {
+      "main": [
+        [
+          {
+            "node": "Add System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct a list of Messages for OpenAI API": {
+      "main": [
+        [
+          {
+            "node": "Call OpenAI Platform API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OpenAI Platform API": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook endpoint": {
+      "main": [
+        [
+          {
+            "node": "Generate a Session ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9bb5de27-f930-4d2c-b183-fd875ec9879e",
+  "meta": {
+    "instanceId": "12dac942c870ba581843076a32ae6fc3461cf956303dad8624c91166b0c4949b"
+  },
+  "id": "Wjsd2MW6M12Ain3u",
+  "tags": []
+}

@@ -30,11 +30,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
+    Source,
     DraftRequest,
     ArticleContent,
     OutlineItem,
     Citation,
     QualityMetrics,
+    DeepResearchFact,
 } from '@/lib/n8n-service';
 
 interface DraftStepProps {
@@ -101,42 +103,11 @@ const initialOutline: OutlineItem[] = [
 export const DraftStep = ({ workflowManager }: DraftStepProps) => {
     const [outline, setOutline] = useState<OutlineItem[]>(initialOutline);
     const [template, setTemplate] = useState('academic');
+    const [isGenerating, setIsGenerating] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isRefining, setIsRefining] = useState(false);
     const [feedback, setFeedback] = useState('');
-    const [content, setContent] =
-        useState(`# The Transformative Impact of Artificial Intelligence in Healthcare
-
-## Introduction to AI in Healthcare
-
-Artificial intelligence (AI) represents one of the most significant technological advances in modern healthcare, offering unprecedented opportunities to enhance patient care, streamline operations, and improve clinical outcomes [1]. The integration of AI technologies into healthcare systems has accelerated rapidly, driven by advances in machine learning, increased computational power, and the growing availability of healthcare data.
-
-## Current Applications and Technologies
-
-Today's healthcare AI applications span multiple domains, from diagnostic imaging to clinical decision support systems. Machine learning algorithms have demonstrated remarkable accuracy in medical imaging, achieving diagnostic performance that often matches or exceeds that of experienced clinicians [2]. These systems are particularly effective in radiology, pathology, and ophthalmology, where pattern recognition is crucial.
-
-## Benefits and Efficiency Gains
-
-The implementation of AI in healthcare has led to significant improvements in diagnostic accuracy, treatment efficiency, and patient outcomes. Clinical decision support systems powered by AI can analyze vast amounts of patient data to suggest optimal treatment plans, reducing medical errors and improving care quality [3]. Additionally, AI-driven automation has streamlined administrative tasks, allowing healthcare professionals to focus more on patient care.
-
-## Challenges and Limitations  
-
-Despite its promising applications, AI in healthcare faces several challenges. Data privacy and security concerns remain paramount, as healthcare AI systems require access to sensitive patient information. Furthermore, the "black box" nature of many AI algorithms raises questions about transparency and accountability in clinical decision-making [4]. Healthcare providers must also navigate regulatory frameworks and ensure AI systems are validated for clinical use.
-
-## Future Prospects and Developments
-
-The future of AI in healthcare holds immense potential, with emerging technologies like personalized medicine, predictive analytics, and robotic surgery on the horizon. As AI systems become more sophisticated and interpretable, we can expect broader adoption across healthcare settings. Integration with wearable devices and real-time monitoring systems will enable proactive healthcare management and early intervention strategies.
-
-## Conclusion and Recommendations
-
-Artificial intelligence represents a transformative force in healthcare, offering unprecedented opportunities to improve patient outcomes and operational efficiency. However, successful implementation requires careful consideration of ethical, regulatory, and technical challenges. Healthcare organizations should invest in robust data infrastructure, staff training, and collaborative partnerships to fully realize AI's potential while maintaining patient safety and trust.
-
-## References
-
-[1] Nature Medicine - The Future of Artificial Intelligence in Healthcare
-[2] PubMed - Machine Learning Applications in Clinical Decision Support  
-[3] Bioethics.org - Ethical Considerations in AI-Driven Healthcare Systems
-[4] Health Economics - Cost-Effectiveness of AI Implementation`);
+    const [content, setContent] = useState('Click Generate Draft to start');
 
     // Generate citations based on selected sources
     const citations: Citation[] =
@@ -150,20 +121,48 @@ Artificial intelligence represents a transformative force in healthcare, offerin
             })
         ) || [];
 
-    const handleGenerateDraft = async () => {
+    const handleSimulateGenerateDraft = async () => {
         const selectedSources = workflowManager.state.researchData || [];
 
         const draftRequest: DraftRequest = {
-            sources: selectedSources,
-            outline: outline,
-            template: template,
-            tone: 'professional',
-            targetLength: 2000,
+            facts: selectedSources,
         };
 
         // For now, simulate draft generation
         (await workflowManager.simulateDraft?.(draftRequest)) ||
             simulateDraftGeneration();
+    };
+
+    const handleGenerateDraft = async () => {
+        // Check if we have any research data
+        if (!workflowManager.state.researchData) {
+            console.error('No research data available for draft generation');
+            return;
+        }
+
+        const deepResearchFacts = workflowManager.state.deepResearchData || [];
+        const sourceTitles = workflowManager.state.researchData.map(
+            (item: Source) => item.title
+        );
+        const selectedFacts = deepResearchFacts.filter(
+            (item: DeepResearchFact) => sourceTitles.includes(item.heading)
+        );
+
+        console.log(sourceTitles);
+        console.log(deepResearchFacts);
+
+        const draftRequest: DraftRequest = {
+            facts: selectedFacts,
+        };
+
+        try {
+            setIsGenerating(true);
+            await workflowManager.executeDraft(draftRequest);
+        } catch (error) {
+            console.error('Draft generation failed:', error);
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const simulateDraftGeneration = async () => {
