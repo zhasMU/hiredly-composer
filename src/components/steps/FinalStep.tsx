@@ -53,20 +53,95 @@ Artificial intelligence represents a transformative force in healthcare, offerin
 [2] PubMed - Machine Learning Applications in Clinical Decision Support
 [3] Bioethics.org - Ethical Considerations in AI-Driven Healthcare Systems
 [4] Health Economics - Cost-Effectiveness of AI Implementation`;
+  // Create a blob and download file
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleExport = async (format: string) => {
     setIsExporting(true);
     setExportFormat(format);
     
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock file download
-    const filename = `ai-healthcare-article.${format}`;
+    try {
+      // Try to use the n8n service first
+      if (workflowManager.state.draftData) {
+        const result = await workflowManager.mutations.export.mutateAsync({
+          content: workflowManager.state.draftData,
+          format: format as 'html' | 'docx' | 'pdf' | 'markdown'
+        });
+        
+        if (result.success && result.data.downloadUrl) {
+          // If n8n service returns a download URL, use it
+          window.open(result.data.downloadUrl, '_blank');
+          toast({
+            title: "Export Complete",
+            description: `Article exported as ${format.toUpperCase()}`,
+          });
+          setIsExporting(false);
+          return;
+        }
+      }
+      throw new Error('N8n service not available, using local fallback');
+    } catch (error) {
+      // Fallback to local file generation
+      console.warn('N8n export failed, using local fallback:', error);
+      
+      switch (format) {
+        case 'markdown':
+          downloadFile(article, 'research-article.md', 'text/markdown');
+          toast({
+            title: "Export Complete",
+            description: "Article downloaded as Markdown",
+          });
+          break;
+          
+        case 'html':
+          const htmlContent = convertMarkdownToHtml(article);
+          const completeHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Article</title>
+</head>
+<body>
+${htmlContent}
+</body>
+</html>`;
+          downloadFile(completeHtml, 'research-article.html', 'text/html');
+          toast({
+            title: "Export Complete",
+            description: "Article downloaded as HTML",
+          });
+          break;
+          
+        case 'pdf':
+          await handlePdfExport();
+          break;
+          
+        case 'docx':
+          await handleDocxExport();
+          break;
+          
+        default:
+          downloadFile(article, 'research-article.txt', 'text/plain');
     toast({
       title: "Export Complete",
-      description: `Article exported as ${filename}`,
-    });
+            description: "Article downloaded as text file",
+          });
+      }
+    }
+    
+    setIsExporting(false);
+  };
     
     setIsExporting(false);
   };
