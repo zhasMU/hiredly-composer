@@ -1,5 +1,5 @@
 // Client-side link validation utility
-// Replicates the n8n workflow logic for validating links
+// Uses fetch API for validating links in browser environment
 
 const COMPETITOR_DOMAINS = [
   'indeed.com',
@@ -23,9 +23,6 @@ interface LinkValidationResponse {
   competitorLinks: string[];
 }
 
-// CORS proxy configuration
-const CORS_PROXY = import.meta.env.VITE_CORS_PROXY_URL || 'https://api.allorigins.win/raw?url=';
-
 /**
  * Check if a domain is a competitor
  */
@@ -43,7 +40,7 @@ function isCompetitorDomain(url: string): boolean {
 }
 
 /**
- * Check HTTP status of a single URL
+ * Check HTTP status of a single URL using fetch API
  */
 async function checkUrlStatus(url: string): Promise<ValidationResult> {
   const result: ValidationResult = {
@@ -54,31 +51,136 @@ async function checkUrlStatus(url: string): Promise<ValidationResult> {
   };
 
   try {
-    // Use CORS proxy to check the URL
-    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-    
-    const response = await fetch(proxyUrl, {
-      method: 'HEAD',
-      mode: 'cors',
-      cache: 'no-cache',
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      signal: AbortSignal.timeout(10000) // 10 second timeout
-    });
+    // Use AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    let response: Response;
+    let usedCors = false;
+
+    try {
+      // Try CORS mode first to get proper status codes
+      response = await fetch(url, {
+        method: 'HEAD',
+        mode: 'cors',
+        cache: 'no-cache',
+        headers: {
+          'User-Agent': 'hiredly-composer-link-validator/1.0',
+        },
+        signal: controller.signal
+      });
+      usedCors = true;
+    } catch (corsError) {
+      try {
+        // If CORS fails, try no-cors mode (limited status info)
+        response = await fetch(url, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          cache: 'no-cache',
+          headers: {
+            'User-Agent': 'hiredly-composer-link-validator/1.0',
+          },
+          signal: controller.signal
+        });
+      } catch (headError) {
+        // If HEAD fails completely, try GET with no-cors
+        response = await fetch(url, {
+          method: 'GET',
+          mode: 'no-cors',
+          cache: 'no-cache',
+          headers: {
+            'User-Agent': 'hiredly-composer-link-validator/1.0',
+          },
+          signal: controller.signal
+        });
+      }
+    }
+
+    clearTimeout(timeoutId);
 
     result.status = response.status;
-    // STATUS 2xx = valid
-    result.isValid = response.status >= 200 && response.status < 300;
+    
+    if (usedCors && response.status !== 0) {
+      // We have proper HTTP status codes from CORS mode
+      if (response.status >= 200 && response.status < 300) {
+        // 2xx = Success
+        result.isValid = !result.isCompetitor;
+      } else if (response.status >= 400 && response.status < 500) {
+        // 4xx = Client Error (404 Not Found, 403 Forbidden, etc.)
+        result.isValid = false;
+        result.error = `HTTP ${response.status}: ${getStatusText(response.status)}`;
+      } else if (response.status >= 500) {
+        // 5xx = Server Error (treat as temporarily invalid)
+        result.isValid = false;
+        result.error = `HTTP ${response.status}: Server Error`;
+      } else if (response.status >= 300 && response.status < 400) {
+        // 3xx = Redirection (fetch should handle this automatically, but just in case)
+        result.isValid = !result.isCompetitor;
+      }
+    } else {
+      // no-cors mode or status is 0 (opaque response)
+      if (response.type === 'opaque') {
+        // Request completed but we can't see the status due to CORS
+        // This usually means the URL is reachable, but we can't verify if it's a 404
+        // We'll be conservative and consider it valid if not a competitor
+        result.isValid = !result.isCompetitor;
+        result.status = 200; // Assume success since we can't tell
+        result.error = 'Status unknown due to CORS restrictions';
+      } else {
+        // Unexpected case
+        result.isValid = false;
+        result.error = 'Unable to determine response status';
+      }
+    }
 
   } catch (error) {
     console.warn('Failed to check URL:', url, error);
-    result.error = error instanceof Error ? error.message : 'Unknown error';
+    
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        result.error = 'Request timeout';
+      } else if (error.message.includes('Failed to fetch')) {
+        result.error = 'Network error or URL not reachable';
+      } else if (error.message.includes('CORS')) {
+        result.error = 'CORS policy blocked the request';
+      } else {
+        result.error = error.message;
+      }
+    } else {
+      result.error = 'Unknown error';
+    }
+    
     result.status = 0;
     result.isValid = false;
   }
 
   return result;
+}
+
+/**
+ * Get human-readable status text for HTTP status codes
+ */
+function getStatusText(status: number): string {
+  const statusTexts: Record<number, string> = {
+    200: 'OK',
+    201: 'Created',
+    204: 'No Content',
+    301: 'Moved Permanently',
+    302: 'Found',
+    304: 'Not Modified',
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    403: 'Forbidden',
+    404: 'Not Found',
+    405: 'Method Not Allowed',
+    429: 'Too Many Requests',
+    500: 'Internal Server Error',
+    502: 'Bad Gateway',
+    503: 'Service Unavailable',
+    504: 'Gateway Timeout'
+  };
+  
+  return statusTexts[status] || 'Unknown Status';
 }
 
 /**
@@ -132,6 +234,11 @@ export async function validateLinks(
     // Check URL (with or without HTTP request)
     const result = useHttpCheck ? await checkUrlStatus(url) : checkUrlBasic(url);
     results.push(result);
+
+    // Add small delay to avoid overwhelming servers
+    if (useHttpCheck && i < urls.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }
 
   // Final progress update
