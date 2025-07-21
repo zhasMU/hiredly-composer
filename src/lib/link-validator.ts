@@ -34,8 +34,8 @@ function isCompetitorDomain(url: string): boolean {
     // Parse hostname & strip leading 'www.'
     const host = new URL(url).hostname.replace(/^www\./, '');
     
-    // Check if hostname ends with any competitor domain
-    return COMPETITOR_DOMAINS.some(c => host === c || host.endsWith('.' + c));
+    // Check if the hostname matches, is a subdomain, or a country-specific version
+    return COMPETITOR_DOMAINS.some(c => host === c || host.endsWith('.' + c) || host.startsWith(c + '.'));
   } catch (error) {
     console.warn('Invalid URL:', url);
     return false;
