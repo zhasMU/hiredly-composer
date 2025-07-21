@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { Download, Copy, FileText, CheckCircle, RotateCcw } from "lucide-react";
+import { Download, Copy, FileText, CheckCircle, RotateCcw, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import showdown from 'showdown';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { convertMarkdownToDocx, downloadDocx } from '@mohtasham/md-to-docx';
 
 interface FinalStepProps {
   workflowManager: any; // We'll properly type this later
@@ -54,21 +58,290 @@ Artificial intelligence represents a transformative force in healthcare, offerin
 [3] Bioethics.org - Ethical Considerations in AI-Driven Healthcare Systems
 [4] Health Economics - Cost-Effectiveness of AI Implementation`;
 
-  const handleExport = async (format: string) => {
+  // Convert markdown to HTML using Showdown
+  const convertMarkdownToHtml = (markdown: string): string => {
+    // Configure Showdown with GitHub flavor and additional options
+    const converter = new showdown.Converter({
+      flavor: 'github',
+      tables: true,
+      strikethrough: true,
+      tasklists: true,
+      ghCodeBlocks: true,
+      headerLevelStart: 1,
+      simpleLineBreaks: true,
+      openLinksInNewWindow: true,
+      parseImgDimensions: true,
+      ghCompatibleHeaderId: true,
+      customizedHeaderId: true,
+      encodeEmails: true,
+      ellipsis: true,
+      emoji: true,
+      underline: false,
+      completeHTMLDocument: false
+    });
+
+    // Convert markdown to HTML and return clean HTML without styling
+    return converter.makeHtml(markdown);
+  };
+
+  // Create a blob and download file
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+    const handleExport = async (format: string) => {
     setIsExporting(true);
     setExportFormat(format);
     
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock file download
-    const filename = `ai-healthcare-article.${format}`;
-    toast({
-      title: "Export Complete",
-      description: `Article exported as ${filename}`,
-    });
+    try {
+      // Try to use the n8n service first
+      if (workflowManager.state.draftData) {
+        const result = await workflowManager.mutations.export.mutateAsync({
+          content: workflowManager.state.draftData,
+          format: format as 'html' | 'docx' | 'pdf' | 'markdown'
+        });
+        
+        if (result.success && result.data.downloadUrl) {
+          // If n8n service returns a download URL, use it
+          window.open(result.data.downloadUrl, '_blank');
+          toast({
+            title: "Export Complete",
+            description: `Article exported as ${format.toUpperCase()}`,
+          });
+          setIsExporting(false);
+          return;
+        }
+      }
+      throw new Error('N8n service not available, using local fallback');
+    } catch (error) {
+      // Fallback to local file generation
+      console.warn('N8n export failed, using local fallback:', error);
+      
+      switch (format) {
+        case 'markdown':
+          downloadFile(article, 'research-article.md', 'text/markdown');
+          toast({
+            title: "Export Complete",
+            description: "Article downloaded as Markdown",
+          });
+          break;
+          
+        case 'html':
+          const htmlContent = convertMarkdownToHtml(article);
+          const completeHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Article</title>
+</head>
+<body>
+${htmlContent}
+</body>
+</html>`;
+          downloadFile(completeHtml, 'research-article.html', 'text/html');
+          toast({
+            title: "Export Complete",
+            description: "Article downloaded as HTML",
+          });
+          break;
+          
+        case 'pdf':
+          await handlePdfExport();
+          break;
+          
+        case 'docx':
+          await handleDocxExport();
+          break;
+          
+        default:
+          downloadFile(article, 'research-article.txt', 'text/plain');
+          toast({
+            title: "Export Complete",
+            description: "Article downloaded as text file",
+          });
+      }
+    }
     
     setIsExporting(false);
+  };
+
+  const handlePdfExport = async () => {
+    try {
+      // Create a temporary div with the article content for PDF generation
+      const tempDiv = document.createElement('div');
+      tempDiv.style.cssText = `
+        font-family: 'Georgia', 'Times New Roman', serif;
+        line-height: 1.6;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: white;
+        color: #333;
+      `;
+      
+      // Convert markdown to HTML and add to temp div
+      const htmlContent = convertMarkdownToHtml(article);
+      tempDiv.innerHTML = htmlContent;
+      
+      // Temporarily add to document for rendering
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      document.body.appendChild(tempDiv);
+      
+      // Generate canvas from the HTML
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+      
+      // Remove temp div
+      document.body.removeChild(tempDiv);
+      
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= 297; // A4 height in mm
+      
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= 297;
+      }
+      
+      // Save the PDF
+      pdf.save('research-article.pdf');
+      
+      toast({
+        title: "PDF Export Complete",
+        description: "Article downloaded as PDF",
+      });
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      toast({
+        title: "PDF Export Failed",
+        description: "Unable to generate PDF. Please try HTML or Markdown.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDocxExport = async () => {
+    try {
+      // Use the md-to-docx library to convert markdown to DOCX
+      const blob = await convertMarkdownToDocx(article, {
+        documentType: 'document',
+        style: {
+          titleSize: 32,
+          headingSpacing: 240,
+          paragraphSpacing: 240,
+          lineSpacing: 1.15,
+          heading1Size: 28,
+          heading2Size: 24,
+          heading3Size: 20,
+          heading4Size: 18,
+          heading5Size: 16,
+          paragraphSize: 22,
+          listItemSize: 22,
+          codeBlockSize: 20,
+          blockquoteSize: 22,
+          paragraphAlignment: "JUSTIFIED",
+        }
+      });
+      
+      // Download the DOCX file
+      downloadDocx(blob, "research-article.docx");
+      
+      toast({
+        title: "Word Export Complete",
+        description: "Article downloaded as Word document",
+      });
+    } catch (error) {
+      console.error('DOCX export failed:', error);
+      toast({
+        title: "Word Export Failed",
+        description: "Unable to generate Word document. Please try HTML or Markdown.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadAsHtml = async () => {
+    setIsExporting(true);
+    setExportFormat('html');
+    
+    try {
+      const htmlContent = convertMarkdownToHtml(article);
+      
+      // Wrap in basic HTML document structure for download
+      const completeHtmlDocument = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Article</title>
+</head>
+<body>
+${htmlContent}
+</body>
+</html>`;
+      
+      downloadFile(completeHtmlDocument, 'research-article.html', 'text/html');
+      
+      toast({
+        title: "HTML Download Complete",
+        description: "Article downloaded as clean HTML file",
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Unable to download HTML file",
+        variant: "destructive",
+      });
+    }
+    
+    setIsExporting(false);
+  };
+
+  const handleCopyAsHtml = async () => {
+    try {
+      const htmlContent = convertMarkdownToHtml(article);
+      await navigator.clipboard.writeText(htmlContent);
+      toast({
+        title: "HTML Copied",
+        description: "Article HTML has been copied to your clipboard",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy Failed",
+        description: "Unable to copy HTML to clipboard",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCopyToClipboard = async () => {
@@ -237,6 +510,15 @@ Artificial intelligence represents a transformative force in healthcare, offerin
                 <Button
                   variant="outline"
                   className="w-full justify-start"
+                  onClick={handleDownloadAsHtml}
+                  disabled={!isReadyForExport || isExporting}
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  {isExporting && exportFormat === 'html' ? 'Downloading...' : 'Download as HTML'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
                   onClick={() => handleExport('pdf')}
                   disabled={!isReadyForExport || isExporting}
                 >
@@ -264,7 +546,15 @@ Artificial intelligence represents a transformative force in healthcare, offerin
                   onClick={handleCopyToClipboard}
                 >
                   <Copy className="h-4 w-4 mr-2" />
-                  Copy to Clipboard
+                  Copy as Markdown
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={handleCopyAsHtml}
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  Copy as HTML
                 </Button>
                 <Button
                   variant="outline"
